@@ -5,13 +5,13 @@ import "vendor:glfw";
 import "core:fmt";
 
 import "core";
-import "ui";
 
 main :: proc () {
-  using core;
 
-  ctx: Context = create_context();
-  head: Node = ui.create_node(&ctx, "head");
+  ctx: Context = core.create_context();
+  head: Node = create_node(&ctx, "head");
+  
+  print_nodes(&ctx.root);
 
   for bool(!glfw.WindowShouldClose(ctx.window)) {
     

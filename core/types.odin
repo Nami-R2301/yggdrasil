@@ -1,14 +1,17 @@
 package core;
 
+import "vendor:glfw";
 
-FileError :: enum {
+
+Error :: enum {
   None,
   FileNotFound,
   ReadError,
   PermissionError,
   FileTooBig,
   FileLocked,
-  InvalidConfig
+  InvalidConfig,
+  UinitializedContext
 }
 
 Framebuffer :: struct {
@@ -21,11 +24,22 @@ Vbo :: struct {
 }
 
 
+Context :: struct {
+  window:       glfw.WindowHandle,
+  root:         ^Node,
+  last_node:    Option(Node),
+  cursor:       [2]u16,
+  framebuffers: []Framebuffer,
+  textures:     []Texture,
+  vbos:         []Vbo,
+  debug_level:  DebugLevel
+}
+
 Node :: struct {
   parent: ^Node,
   id: u16,
   tag: string,
-  children: map[string]Node,
+  children: map[string]Option(Node),
   style: map[string]any,
   properties: map[string]any
 }
@@ -45,14 +59,15 @@ none :: proc ($T: typeid) -> Option(T) {
 }
 
 is_some :: proc(opt: Option($T)) -> bool {
-  switch _ in opt {
+  #partial switch _ in opt {
     case T:     return true;
     case nil:  return false;
   }
+  return false;
 }
 
 unwrap :: proc (opt: Option($T)) -> T {
-  switch value in opt {
+  #partial switch value in opt {
     case T:       return value;
     case rawptr:  panic("Unwrapping a None Value");
     case nil:     panic("Unwrapping a None value");
