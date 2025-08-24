@@ -7,11 +7,17 @@ import "core:fmt";
 import "core";
 
 main :: proc () {
+  using core;
 
-  ctx: Context = core.create_context();
+  ctx: Context = create_context();
   head: Node = create_node(&ctx, "head");
   
-  print_nodes(&ctx.root);
+  error := add_node(&ctx, head);
+  if error != Error.None {
+    fmt.eprintfln("[ERR]:\t  --- Error adding node to tree: {}", error);
+  }
+
+  print_nodes(ctx.root);
 
   for bool(!glfw.WindowShouldClose(ctx.window)) {
     
