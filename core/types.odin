@@ -25,6 +25,7 @@ Node :: struct {
   parent: ^Node,
   id: u16,
   tag: string,
+  children: map[string]Node,
   style: map[string]any,
   properties: map[string]any
 }

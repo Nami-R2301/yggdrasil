@@ -17,7 +17,10 @@ create_node :: proc (ctx: ^core.Context, tag: string,  at: core.Option(u16) = ni
       parent = ctx.last_node,
       id = placement + 1,
       tag = tag,
+      children = {},
       style = style,
       properties = properties
     };
 }
+
+
