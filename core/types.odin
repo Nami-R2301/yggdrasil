@@ -11,7 +11,9 @@ Error :: enum {
   FileTooBig,
   FileLocked,
   InvalidConfig,
-  UinitializedContext
+  UinitializedContext,
+  DuplicateId,
+  NodeNotFound
 }
 
 Framebuffer :: struct {
@@ -39,9 +41,9 @@ Node :: struct {
   parent: ^Node,
   id: u16,
   tag: string,
-  children: map[string]Option(Node),
-  style: map[string]any,
-  properties: map[string]any
+  children: map[u16]Option(Node),
+  style: map[u16]Option(any),
+  properties: map[u16]Option(any)
 }
 
 // Optional type in odin
