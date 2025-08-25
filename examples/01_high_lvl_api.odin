@@ -1,0 +1,4 @@
+package examples;
+
+main :: proc () {
+}
