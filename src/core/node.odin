@@ -42,6 +42,7 @@ create_node :: proc (ctx: ^Context, id: u16, tag: string, parent: Option(Node), 
 }
 
 destroy_node ::proc (ctx: ^Context, id: u16) -> Error {
+  panic("Not Implemented");
   return Error.None; 
 }
 
@@ -123,6 +124,7 @@ detach_node :: proc (ctx: ^Context, id: u16, from: Option(string)) -> (Option(No
 }
 
 find_node :: proc (ctx: ^Context, id: u16) -> Option(Node) {
+  panic("Not Implemented");
   return none(Node);
 }
 
