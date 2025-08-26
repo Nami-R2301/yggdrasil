@@ -9,7 +9,10 @@ import "../src/core";
 main :: proc () {
   using core;
 
-  ctx: Context = create_context();
+  temp_config: map[string]Option(string) = {};
+  temp_config["debug_level"] = some("Everything");
+
+  ctx: Context = create_context(config = temp_config);
   _, wrapped_head := create_node(&ctx, 1, "head", none(Node));
   _, wrapped_link := create_node(&ctx, 2, "link", none(Node)); 
 
@@ -19,7 +22,7 @@ main :: proc () {
   error := attach_node(&ctx, head, none(u16));
   error = attach_node(&ctx, link, some(head.id));
 
-  print_nodes(ctx.root);
+  //print_nodes(ctx.root);
 
   for bool(!glfw.WindowShouldClose(ctx.window)) {
     
