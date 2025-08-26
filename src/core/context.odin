@@ -3,14 +3,10 @@ package core;
 import "vendor:glfw";
 import "core:fmt";
 
-create_context :: proc (window: glfw.WindowHandle = nil, config: map[string]string = {}, debug_level: DebugLevel = DebugLevel.Verbose, root: Node = {
-  parent = nil,
-  id = 0,
-  tag = "root",
-  style = {},
-  properties = {}
-}) -> Context {
+create_context :: proc (window: glfw.WindowHandle = nil, config: map[string]Option(string)) -> Context {
   new_window := window;
+  sanitized_config, verify_error := verify_config(config);
+  debug_level, parse_error := parse_config(sanitized_config);
 
   if debug_level >= DebugLevel.Normal {
     fmt.println("[INFO]:\t| Creating context...");
@@ -28,22 +24,13 @@ create_context :: proc (window: glfw.WindowHandle = nil, config: map[string]stri
     glfw.MakeContextCurrent(new_window);
   }
   
-  new_root := root;
-  if len(config) > 0 {
-    sanitized_config, verify_error := verify_config(config);
-    debug_level, style, properties, parse_error := parse_config(sanitized_config);
-
-    new_root.style = style;
-    new_root.properties = properties;
-  }
-
   if debug_level >= DebugLevel.Normal {
-    fmt.printfln("[INFO]:\t  --- Created context with root node '{}' [{}]", root.tag, root.id);
+    fmt.println("[INFO]:\t  --- Created context");
   }
 
   return Context {
     window = new_window,
-    root = new_clone(root),
+    root = nil,
     last_node = none(Node),
     cursor = {0, 0},
     framebuffers = {},

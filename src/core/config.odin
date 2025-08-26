@@ -1,9 +1,21 @@
 package core;
 
-verify_config :: proc (config: map[string]string) -> (sanitized_config: map[string]string, error: Error) {
-  return {}, Error.None;
+verify_config :: proc (config: map[string]Option(string)) -> (sanitized_config: map[string]Option(string), error: Error) {
+  panic("Unimplemented"); 
 }
 
-parse_config :: proc (verified_config: map[string]string) -> (debug_level: DebugLevel, style: map[u16]Option(any), properties: map[u16]Option(any), error: Error) {
-  return DebugLevel.Normal, {}, {}, Error.None;
+parse_config :: proc (verified_config: map[string]Option(string)) -> (debug_level: DebugLevel, error: Error) {
+  for key, &value in verified_config {
+    if key == "debug_level" {
+      switch unwrap_or(value, "None") {
+        case "None":        debug_level = DebugLevel.None;
+        case "Normal":      debug_level = DebugLevel.Normal;
+        case "Verbose":     debug_level = DebugLevel.Verbose;
+        case "Everything":  debug_level = DebugLevel.Everything;
+        case:               debug_level = DebugLevel.None;
+      }
+    }
+  }
+
+  return debug_level, Error.None;
 }

@@ -28,10 +28,10 @@ create_node :: proc (ctx: ^Context, id: u16, tag: string, parent: Option(Node), 
 
     parent: ^Node = is_some(parent) ? new_clone(unwrap(parent)) : ctx.root; 
     if ctx.debug_level >= DebugLevel.Verbose {
-      fmt.printfln("[INFO]:\t --- Created node '%s' [%d] under '%s' [%d]", tag, id, parent.tag, parent.id);
+      fmt.printfln("[INFO]:\t --- Created node '%s' [%d] under '%s' [%d]", tag, id, parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0);
     }
 
-    return Error.None, Node {
+    new_node := Node {
       parent = parent,
       id = id,
       tag = tag,
@@ -39,11 +39,16 @@ create_node :: proc (ctx: ^Context, id: u16, tag: string, parent: Option(Node), 
       style = style,
       properties = properties
     };
+
+    if parent == nil {
+      ctx.root = new_clone(new_node);
+    }
+
+    return Error.None, new_node;
 }
 
 destroy_node ::proc (ctx: ^Context, id: u16) -> Error {
   panic("Not Implemented");
-  return Error.None; 
 }
 
 // Low-level API to attach a node to the current ui tree. Benefit of this function over its high-level counterparts 'begin_node(...)' is the ability to explicitely
@@ -125,7 +130,6 @@ detach_node :: proc (ctx: ^Context, id: u16, from: Option(string)) -> (Option(No
 
 find_node :: proc (ctx: ^Context, id: u16) -> Option(Node) {
   panic("Not Implemented");
-  return none(Node);
 }
 
 
