@@ -16,22 +16,19 @@ import "core:fmt";
 // @param style:        CSS-like style mapping to be applied upon rendering on each frame.
 // @param properties:   Data map to store information related to the node as well as override default ones (alt, disabled, type, etc...) which will mutate the node's functionality.
 // @param children:     The leaf nodes related under this one,
-create_node :: proc (ctx: ^Context, id: u16, tag: string, parent: Option(Node), style: map[u16]Option(any) = {}, properties: map[u16]Option(any) = {}, children: map[u16]Option(Node) = {}) -> (error: Error, node: Option(Node)) {
+create_node :: proc (ctx: ^Context, id: u16, tag: string, parent: Option(^Node) = nil, style: map[u16]Option(any) = {}, properties: map[u16]Option(any) = {}, children: map[u16]Option(Node) = {}) -> Node {
+    assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
+
     if ctx.debug_level >= DebugLevel.Verbose {
       fmt.printfln("[INFO]:\t| Creating node '{}' [{}]...", tag, id);
     }
 
-    node_opt := find_node(ctx, id);
-    if is_some(node_opt) {
-      return Error.DuplicateId, none(Node);
-    }
-
-    parent: ^Node = is_some(parent) ? new_clone(unwrap(parent)) : ctx.root; 
+    parent: ^Node = unwrap_or(parent, ctx.root); 
     if ctx.debug_level >= DebugLevel.Verbose {
       fmt.printfln("[INFO]:\t --- Created node '%s' [%d] under '%s' [%d]", tag, id, parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0);
     }
 
-    new_node := Node {
+    node := Node {
       parent = parent,
       id = id,
       tag = tag,
@@ -41,14 +38,98 @@ create_node :: proc (ctx: ^Context, id: u16, tag: string, parent: Option(Node), 
     };
 
     if parent == nil {
-      ctx.root = new_clone(new_node);
+      ctx.root = new_clone(node);
     }
 
-    return Error.None, new_node;
+    return node;
 }
 
-destroy_node ::proc (ctx: ^Context, id: u16) -> Error {
+reset_node :: proc (ctx: ^Context, id: u16) -> Error {
+  assert(ctx != nil, "[ERR]:\t| Error resetting node: Context is nil!");
   panic("Not Implemented");
+}
+
+destroy_node :: proc (ctx: ^Context, id: u16) -> Error {
+  assert(ctx != nil, "[ERR]:\t| Error destroying node: Context is nil!");
+
+  node_opt := find_node(ctx, id);
+  if !is_some(node_opt) {
+    if ctx.debug_level >= DebugLevel.Normal {
+      fmt.eprintfln("[ERR]:\t  --- Error destroying node: Node [{}] not found", id);
+    }
+    return Error.NodeNotFound;
+  }
+
+  node := unwrap(node_opt);
+  if node.parent == ctx.root {
+    free(node.parent);
+  }
+
+  // Add garbage indicator to avoid reading garbage.
+  node.parent     = nil;
+  node.tag        = "N/A";
+  node.style      = {};
+  node.properties = {};
+  node.children   = {};
+  
+  if ctx.debug_level >= DebugLevel.Verbose {
+    fmt.printfln("[INFO]:\t  --- Destroyed node [{}] and its children", id)
+  }
+
+  return Error.None;
+}
+
+
+find_node :: proc (ctx: ^Context, id: u16) -> Option(Node) {
+  assert(ctx != nil, "[ERR]:\t| Error finding node: Context is nil!");
+
+  if ctx.root == nil {
+    return none(Node);
+  }
+
+  if id == ctx.root.id {
+    return some(ctx.root^);
+  }
+
+  return _find_node(some(ctx.root^), id);
+}
+
+_find_node :: proc (current_node_opt: Option(Node), id: u16) -> Option(Node) {
+  if is_some(current_node_opt) {
+    current_node := unwrap(current_node_opt);
+    for child_id, &child_opt in current_node.children {
+      if child_id == id {
+        return child_opt;
+      }
+
+      child := unwrap(child_opt);
+      if len(child.children) > 0 {
+        inner_node := _find_node(child_opt, id);
+        if is_some(inner_node) {
+          return inner_node;
+        }
+      }
+    }
+  }
+
+  return none(Node);
+}
+
+get_tree_depth :: proc (root: ^Node) -> u16 {
+  if root == nil {
+    return 0;
+  }
+
+  depth: u16 = u16(len(root.children));  
+
+  for id, &leaf_opt in root.children {
+    if is_some(leaf_opt) {
+      leaf := unwrap(leaf_opt);
+      depth += get_tree_depth(&leaf);
+    }
+  }
+
+  return depth;
 }
 
 // Low-level API to attach a node to the current ui tree. Benefit of this function over its high-level counterparts 'begin_node(...)' is the ability to explicitely
@@ -58,33 +139,30 @@ destroy_node ::proc (ctx: ^Context, id: u16) -> Error {
 //
 // @param ctx:    The current tree where we want to attach this node to. 
 // @param node:   Which node is to be added to the tree
-attach_node :: proc (ctx: ^Context, node: Node, to: Option(u16)) -> Error {
+attach_node :: proc (ctx: ^Context, node: Node) -> Error {
+  assert(ctx != nil, "[ERR]:\t| Error attaching node: Context is nil!");
+  
   if ctx.debug_level >= DebugLevel.Verbose {
     fmt.printfln("[INFO]:\t| Attaching '{}' [{}] to context tree", node.tag, node.id);
   }
 
-  if ctx == nil {
-    return Error.UinitializedContext;
-  }
+  parent: ^Node = node.parent;
+  if parent != nil  {
+    parent_opt := find_node(ctx, node.parent.id);
 
-  parent: ^Node = nil;
-  if is_some(to) {
-    wrapped_parent := find_node(ctx, unwrap(to));
-
-    if !is_some(wrapped_parent) {
+    if !is_some(parent_opt) {
       if ctx.debug_level >= DebugLevel.Normal {
-        fmt.eprintfln("[ERR]:\t  --- Error when attaching node '{}' [{}] into parent [{}]: Parent not found", node.tag, node.id, unwrap(to));
+        fmt.eprintfln("[ERR]:\t  --- Error when attaching node '{}' [{}] into parent '{}' [{}]: Parent not found", node.tag, node.id, node.parent.tag, node.parent.id);
       }
       return Error.NodeNotFound;
     }
-
-    parent = new_clone(unwrap(wrapped_parent));
   } else {
-    parent = is_some(ctx.last_node) ? new_clone(unwrap(ctx.last_node)) : ctx.root;
+    parent = ctx.last_node != nil ? ctx.last_node : ctx.root;
   }
   
   parent.children[node.id] = some(node);
-  ctx.last_node = some(node);
+  free(ctx.last_node);
+  ctx.last_node = new_clone(node);
   
   if ctx.debug_level >= DebugLevel.Verbose {
     fmt.printfln("[INFO]:\t  --- Attached '{}' [{}] to context tree at '{}' [{}]...", node.tag, node.id, parent.tag, parent.id);
@@ -92,44 +170,34 @@ attach_node :: proc (ctx: ^Context, node: Node, to: Option(u16)) -> Error {
   return Error.None
 }
 
-detach_node :: proc (ctx: ^Context, id: u16, from: Option(string)) -> (Option(Node), Error) {
+detach_node :: proc (ctx: ^Context, id: u16) -> Option(Node) { 
+  assert(ctx != nil, "[ERR]:\t| Error detaching node: Context is nil!");
+  
   if ctx.debug_level >= DebugLevel.Verbose {
     fmt.printfln("[INFO]:\t| Detaching [{}] from context tree...", id);
   }
-
-  if ctx == nil {
-    return none(Node), Error.UinitializedContext;
-  } 
   
-  wrapped_node := find_node(ctx, id);
-  if !is_some(wrapped_node) {
-    return wrapped_node, Error.None;
+  node_opt := find_node(ctx, id);
+  if !is_some(node_opt) {
+   return none(Node);
   }
   
-  node := unwrap(wrapped_node);
-  parent := node.parent;
+  node := unwrap(node_opt);
 
-  if parent == nil {
+  if node.parent == nil {
     if ctx.debug_level >= DebugLevel.Verbose {
       fmt.printfln("[WARN]:\t  --- Cannot detach unattached parent node [{}], skipping...", id);
     }
 
-    return none(Node), Error.None;
+    return none(Node);
   }
 
-  if parent != nil {
-    parent.children[node.id] = none(Node);
-  }
+  destroy_node(ctx, id);
 
   if ctx.debug_level >= DebugLevel.Verbose {
-    fmt.printfln("[INFO]:\t  --- Detached [{}] from '{}' [{}]", id, parent.tag, parent.id);
+    fmt.printfln("[INFO]:\t  --- Detached [{}] from '{}' [{}]", id, node.parent.tag, node.parent.id);
   }
 
-  return wrapped_node, Error.None;
+  return node;
 }
-
-find_node :: proc (ctx: ^Context, id: u16) -> Option(Node) {
-  panic("Not Implemented");
-}
-
 

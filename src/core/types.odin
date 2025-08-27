@@ -5,6 +5,9 @@ import "vendor:glfw";
 
 Error :: enum {
   None,
+  InvalidContext,
+  InvalidWindow,
+  GlfwError,
   FileNotFound,
   ReadError,
   PermissionError,
@@ -29,7 +32,7 @@ Vbo :: struct {
 Context :: struct {
   window:       glfw.WindowHandle,
   root:         ^Node,
-  last_node:    Option(Node),
+  last_node:    ^Node,
   cursor:       [2]u16,
   framebuffers: []Framebuffer,
   textures:     []Texture,
@@ -47,20 +50,20 @@ Node :: struct {
 }
 
 // Optional type in odin
-Option :: union($T: typeid) {
+Option :: union ($T: typeid) {
   T,
   rawptr
 }
 
-some :: proc (value: $T) -> Option(T) {
+some :: proc "contextless" (value: $T) -> Option(T) {
   return value;
 }
 
-none :: proc ($T: typeid) -> Option(T) {
+none :: proc "contextless" ($T: typeid) -> Option(T) {
   return nil;
 }
 
-is_some :: proc(opt: Option($T)) -> bool {
+is_some :: proc "contextless" (opt: Option($T)) -> bool {
   #partial switch _ in opt {
     case T:     return true;
     case nil:  return false;
@@ -78,7 +81,7 @@ unwrap :: proc (opt: Option($T)) -> T {
   return T{};  // Unreachable
 }
 
-unwrap_or :: proc (opt: Option($T), default: T) -> T {
+unwrap_or :: proc "contextless" (opt: Option($T), default: T) -> T {
   switch value in opt {
     case T:        return value;
     case rawptr:   return default;

@@ -43,10 +43,10 @@ to_str_enum :: proc (debug: DebugLevel, indent: string = "\t") -> string {
 //
 // @param obj:    Object to deserialize
 // @param indent: The amount of horizontal padding to indent any inner-elements.
-to_str :: proc (ctx: Context, indent: string = "\t    ") -> string {
+to_str :: proc (ctx: ^Context, indent: string = "\t    ") -> string {
   string_builder: strings.Builder = {};
 
   return fmt.sbprintf(&string_builder, "{0}Context: {{\n{0}  Debug Level: {1},\n{0}  Root: {{\n{0}{2}\n{0}}},\n{0}  Window: {3}," +
       "\n{0}  Last Node: {{\n{0}{4}\n{0}}},\n{0}  Cursor: [{5},{6}],\n{0}}}", indent, to_str_enum(ctx.debug_level),
-      to_str_node(ctx.root, "\t\t  "), ctx.window, to_str_option(ctx.last_node, "\t\t  "), ctx.cursor[0], ctx.cursor[1]);
+      to_str_node(ctx.root, "\t\t  "), ctx.window, ctx.last_node, ctx.cursor[0], ctx.cursor[1]);
 }

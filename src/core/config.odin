@@ -1,10 +1,10 @@
 package core;
 
-verify_config :: proc (config: map[string]Option(string)) -> (sanitized_config: map[string]Option(string), error: Error) {
-  panic("Unimplemented"); 
+verify_config :: proc (config: map[string]Option(string)) -> (Error, map[string]Option(string)) {
+  return Error.None, config;
 }
 
-parse_config :: proc (verified_config: map[string]Option(string)) -> (debug_level: DebugLevel, error: Error) {
+parse_config :: proc (verified_config: map[string]Option(string)) -> (error: Error, debug_level: DebugLevel) {
   for key, &value in verified_config {
     if key == "debug_level" {
       switch unwrap_or(value, "None") {
@@ -17,5 +17,5 @@ parse_config :: proc (verified_config: map[string]Option(string)) -> (debug_leve
     }
   }
 
-  return debug_level, Error.None;
+  return Error.None, debug_level;
 }
