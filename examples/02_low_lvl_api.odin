@@ -12,17 +12,18 @@ main :: proc () {
   temp_config: map[string]Option(string) = {};
   temp_config["debug_level"] = some("Everything");
 
-  ctx: Context = create_context(config = temp_config);
-  _, wrapped_head := create_node(&ctx, 1, "head", none(Node));
-  _, wrapped_link := create_node(&ctx, 2, "link", none(Node)); 
+  error, ctx_opt := create_context(config = temp_config);
+  assert(error == Error.None && is_some(ctx_opt), "Error Initializing Context, please check logs or turn on maximum verbosity '-vvv' if missing logs...");
 
-  head := unwrap(wrapped_head);
-  link := unwrap(wrapped_link);
+  ctx := unwrap(ctx_opt);
 
-  error := attach_node(&ctx, head, none(u16));
-  error = attach_node(&ctx, link, some(head.id));
+  head := create_node(&ctx, 1, "head");
+  link := create_node(&ctx, 2, "link"); 
 
-  //print_nodes(ctx.root);
+  error = attach_node(&ctx, head);
+  error = attach_node(&ctx, link);
+
+  print_nodes(ctx.root);
 
   for bool(!glfw.WindowShouldClose(ctx.window)) {
     
@@ -30,6 +31,6 @@ main :: proc () {
     glfw.SwapBuffers(ctx.window);
   }
 
-  defer destroy_context(ctx);
+  defer destroy_context(&ctx);
 }
 
