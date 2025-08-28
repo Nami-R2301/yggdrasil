@@ -1,16 +1,12 @@
-package core;
+package yggdrasil;
 
 import "core:fmt";
 import "core:strings";
 
-DebugLevel :: enum u8 {
-  None       = 0,
-  Normal     = 1,
-  Verbose    = 2,
-  Everything = 3
-}
+import types "types";
+import utils "utils";
 
-print_nodes :: proc(root: ^Node, indent: string = "\t") {
+print_nodes :: proc(root: ^types.Node, indent: string = "\t") {
   if root == nil {
     return;
   }
@@ -32,8 +28,8 @@ print_nodes :: proc(root: ^Node, indent: string = "\t") {
 
   for node, &value in node.children {
     new_indent: string = strings.concatenate({indent, "    "});
-    if is_some(value) {
-      unwrapped := unwrap(value);
+    if utils.is_some(value) {
+      unwrapped := utils.unwrap(value);
       print_nodes(&unwrapped, new_indent);
     }
   }
