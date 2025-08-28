@@ -4,26 +4,27 @@ import "vendor:raylib";
 import "vendor:glfw";
 import "core:fmt";
 
-import "../src/core";
+import ygg "../src";
+import "yggdrasil:utils";
+import "yggdrasil:types";
 
 main :: proc () {
-  using core;
+  using types;
 
   temp_config: map[string]Option(string) = {};
-  temp_config["debug_level"] = some("Everything");
+  temp_config["debug_level"] = utils.some("Everything");
 
-  error, ctx_opt := create_context(config = temp_config);
-  assert(error == Error.None && is_some(ctx_opt), "Error Initializing Context, please check logs or turn on maximum verbosity '-vvv' if missing logs...");
+  error, ctx_opt := ygg._create_context(config = temp_config);
+  assert(error == ContextError.None, "Error creating main context");
+  ctx := utils.unwrap(ctx_opt);
 
-  ctx := unwrap(ctx_opt);
+  head := ygg._create_node(&ctx, 1, "head");
+  link := ygg._create_node(&ctx, 2, "link"); 
 
-  head := create_node(&ctx, 1, "head");
-  link := create_node(&ctx, 2, "link"); 
+  error = ygg._attach_node(&ctx, head);
+  error = ygg._attach_node(&ctx, link);
 
-  error = attach_node(&ctx, head);
-  error = attach_node(&ctx, link);
-
-  print_nodes(ctx.root);
+  ygg.print_nodes(ctx.root);
 
   for bool(!glfw.WindowShouldClose(ctx.window)) {
     
@@ -31,6 +32,6 @@ main :: proc () {
     glfw.SwapBuffers(ctx.window);
   }
 
-  defer destroy_context(&ctx);
+  defer ygg._destroy_context(&ctx);
 }
 

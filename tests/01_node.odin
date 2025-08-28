@@ -2,29 +2,34 @@
 package tests;
 
 import "core:testing";
-import "../src/core";
 import "core:fmt";
 
-config : map[string]core.Option(string) = {
-  "test_mode" =    core.some("on"),
-  "debug_level" =  core.some("None")
+import ygg "../src";
+import "yggdrasil:types";
+import "yggdrasil:utils";
+
+config : map[string]types.Option(string) = {
+  "test_mode" =    utils.some("on"),
+  "debug_level" =  utils.some("None")
 };
 
-setup :: proc (t: ^testing.T) -> core.Context {
-  using core;
+setup :: proc (t: ^testing.T) -> types.Context {
+  using types;
+  using ygg;
+  using utils;
 
-  error, ctx_opt := create_context(config = config);
-  if error != Error.None {
+  error, ctx_opt := _create_context(config = config);
+  if error != ContextError.None {
     fmt.eprintln("[ERR]:\t| Cannot create context: {}", error);
     testing.fail_now(t, "Cannot create context");
   }
   
   ctx := unwrap(ctx_opt);
-  node := create_node(&ctx, 0, "root");
-  error = attach_node(&ctx, node);
-  assert(error == Error.None, "Error creating context");
+  node := _create_node(&ctx, 0, "root");
+  error = _attach_node(&ctx, node);
+  assert(error == ContextError.None, "Error creating context");
 
-  if error != Error.None {
+  if error != ContextError.None {
     fmt.eprintln("[ERR]:\t| Cannot create context: {}", error);
     testing.fail_now(t,"Cannot create context");
   }
@@ -32,92 +37,98 @@ setup :: proc (t: ^testing.T) -> core.Context {
   return ctx;
 }
 
-cleanup :: proc (ctx: ^core.Context) {
-  error := core.destroy_context(ctx);
+cleanup :: proc (ctx: ^types.Context) {
+  using ygg;
 
-  assert(error == core.Error.None, "Error during test cleanup");
+  error := _destroy_context(ctx);
+
+  assert(error == types.ContextError.None, "Error during test cleanup");
 }
 
 
 @(test)
 create_duplicate :: proc (t: ^testing.T) {
-  using core;
+  using types;
+  using ygg;
 
   ctx := setup(t); 
   defer cleanup(&ctx);
 
-  first  := create_node(&ctx, 1, "head");
-  second := create_node(&ctx, 1, "head2");
+  first  := _create_node(&ctx, 1, "head");
+  second := _create_node(&ctx, 1, "head2");
 
-  error := attach_node(&ctx, first);
-  assert(error == Error.None, "Error attaching first node");
-  error = attach_node(&ctx, second);
-  assert(error == Error.None, "Error attaching second node");
+  error := _attach_node(&ctx, first);
+  assert(error == ContextError.None, "Error attaching first node");
+  error = _attach_node(&ctx, second);
+  assert(error == ContextError.None, "Error attaching second node");
   
-  testing.expect_value(t, error, Error.DuplicateId);
+  testing.expect_value(t, error, ContextError.DuplicateId);
 }
 
 @(test)
 find_node :: proc (t: ^testing.T) {
-  using core;
+  using types;
+  using ygg;
+  using utils;
   
   ctx := setup(t);
   defer cleanup(&ctx);
   
-  head  := create_node(&ctx, 1, "head");
-  link := create_node(&ctx, 2, "link", &head);
-  a := create_node(&ctx, 3, "a", &link);
+  head  := _create_node(&ctx, 1, "head");
+  link := _create_node(&ctx, 2, "link", &head);
+  a := _create_node(&ctx, 3, "a", &link);
 
-  node_opt := find_node(&ctx, 3);
+  node_opt := _find_node(&ctx, 3);
   testing.expect(t, !is_some(node_opt));
 
-  error := attach_node(&ctx, head);
-  assert(error == Error.None, "Error attaching <head> node");
+  error := _attach_node(&ctx, head);
+  assert(error == ContextError.None, "Error attaching <head> node");
   
-  error = attach_node(&ctx, link);
-  assert(error == Error.None, "Error attaching <link> node");
+  error = _attach_node(&ctx, link);
+  assert(error == ContextError.None, "Error attaching <link> node");
   
-  error = attach_node(&ctx, a);
-  assert(error == Error.None, "Error attaching <a> node");
+  error = _attach_node(&ctx, a);
+  assert(error == ContextError.None, "Error attaching <a> node");
 }
 
 @(test)
 max_depth :: proc (t: ^testing.T) {
-  using core;
-  
+  using types;
+  using ygg;
+
   ctx := setup(t); 
   defer cleanup(&ctx);
 
   lvl_1: u16 = 4096;
 
   for index in 0..=lvl_1 - 1 {
-    node  := create_node(&ctx, index, "head");
-    error := attach_node(&ctx, node);
-    assert(error == Error.None, "Error attaching node");
+    node  := _create_node(&ctx, index, "head");
+    error := _attach_node(&ctx, node);
+    assert(error == ContextError.None, "Error attaching node");
   }
 
-  testing.expect_value(t, get_tree_depth(ctx.root), lvl_1);
+  testing.expect_value(t, _get_tree_depth(ctx.root), lvl_1);
 
   lvl_2: u16 = lvl_1 * 4;   // 16k
   
 
   for index in lvl_1..=lvl_2 - 1 {
-    node  := create_node(&ctx, index, "head");
-    error := attach_node(&ctx, node);
-    assert(error == Error.None, "Error attaching node");
+    node  := _create_node(&ctx, index, "head");
+    error := _attach_node(&ctx, node);
+    assert(error == ContextError.None, "Error attaching node");
   }
 
 
-  testing.expect_value(t, get_tree_depth(ctx.root), lvl_2);
+  testing.expect_value(t, _get_tree_depth(ctx.root), lvl_2);
 
   lvl_3: u16 = 65535;  // 6.4m
 
 
   for index in lvl_2..=lvl_3 - 1 {
-    node  := create_node(&ctx, index, "head");
-    error := attach_node(&ctx, node);
-    assert(error == Error.None, "Error attaching node");
+    node  := _create_node(&ctx, index, "head");
+    error := _attach_node(&ctx, node);
+    assert(error == ContextError.None, "Error attaching node");
   }
 
-  testing.expect_value(t, get_tree_depth(ctx.root), lvl_3);
+  testing.expect_value(t, _get_tree_depth(ctx.root), lvl_3);
 }
