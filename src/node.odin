@@ -38,12 +38,13 @@ import utils "utils";
 _create_node :: proc (ctx: ^types.Context, id: u16, tag: string, parent: types.Option(^types.Node) = nil, style: map[u16]types.Option(any) = {}, properties: map[u16]types.Option(any) = {}, children: map[u16]types.Option(types.Node) = {}) -> types.Node {
     assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
 
-    if ctx.debug_level >= types.DebugLevel.Verbose {
+    level: types.LogLevel = utils.into_debug(ctx.config["debug_level"]);
+    if level >= types.LogLevel.Verbose {
       fmt.printfln("[INFO]:\t| Creating node '{}' [{}]...", tag, id);
     }
 
     parent: ^types.Node = utils.unwrap_or(parent, ctx.root); 
-    if ctx.debug_level >= types.DebugLevel.Verbose {
+    if level >= types.LogLevel.Verbose {
       fmt.printfln("[INFO]:\t --- Created node '%s' [%d] under '%s' [%d]", tag, id, parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0);
     }
 
@@ -71,9 +72,10 @@ _reset_node :: proc (ctx: ^types.Context, id: u16) -> types.ContextError {
 _destroy_node :: proc (ctx: ^types.Context, id: u16) -> types.ContextError {
   assert(ctx != nil, "[ERR]:\t| Error destroying node: Context is nil!");
 
+  level: types.LogLevel = utils.into_debug(ctx.config["debug_level"]);
   node_opt := _find_node(ctx, id);
   if !utils.is_some(node_opt) {
-    if ctx.debug_level >= types.DebugLevel.Normal {
+    if level >= types.LogLevel.Normal {
       fmt.eprintfln("[ERR]:\t  --- Error destroying node: types.Node [{}] not found", id);
     }
     return types.ContextError.NodeNotFound;
@@ -91,7 +93,7 @@ _destroy_node :: proc (ctx: ^types.Context, id: u16) -> types.ContextError {
   node.properties = {};
   node.children   = {};
   
-  if ctx.debug_level >= types.DebugLevel.Verbose {
+  if level >= types.LogLevel.Verbose {
     fmt.printfln("[INFO]:\t  --- Destroyed node [{}] and its children", id)
   }
 
@@ -162,7 +164,8 @@ _get_tree_depth :: proc (root: ^types.Node) -> u16 {
 _attach_node :: proc (ctx: ^types.Context, node: types.Node) -> types.ContextError {
   assert(ctx != nil, "[ERR]:\t| Error attaching node: Context is nil!");
   
-  if ctx.debug_level >= types.DebugLevel.Verbose {
+  level: types.LogLevel = utils.into_debug(ctx.config["debug_level"]);
+  if level >= types.LogLevel.Verbose {
     fmt.printfln("[INFO]:\t| Attaching '{}' [{}] to context tree", node.tag, node.id);
   }
 
@@ -171,7 +174,7 @@ _attach_node :: proc (ctx: ^types.Context, node: types.Node) -> types.ContextErr
     parent_opt := _find_node(ctx, node.parent.id);
 
     if !utils.is_some(parent_opt) {
-      if ctx.debug_level >= types.DebugLevel.Normal {
+      if level >= types.LogLevel.Normal {
         fmt.eprintfln("[ERR]:\t  --- Error when attaching node '{}' [{}] into parent '{}' [{}]: Parent not found", node.tag, node.id, node.parent.tag, node.parent.id);
       }
       return types.ContextError.NodeNotFound;
@@ -184,7 +187,7 @@ _attach_node :: proc (ctx: ^types.Context, node: types.Node) -> types.ContextErr
   free(ctx.last_node);
   ctx.last_node = new_clone(node);
   
-  if ctx.debug_level >= types.DebugLevel.Verbose {
+  if level >= types.LogLevel.Verbose {
     fmt.printfln("[INFO]:\t  --- Attached '{}' [{}] to context tree at '{}' [{}]...", node.tag, node.id, parent.tag, parent.id);
   }
   return types.ContextError.None
@@ -193,7 +196,8 @@ _attach_node :: proc (ctx: ^types.Context, node: types.Node) -> types.ContextErr
 _detach_node :: proc (ctx: ^types.Context, id: u16) -> types.Option(types.Node) { 
   assert(ctx != nil, "[ERR]:\t| Error detaching node: Context is nil!");
   
-  if ctx.debug_level >= types.DebugLevel.Verbose {
+  level: types.LogLevel = utils.into_debug(ctx.config["debug_level"]);
+  if level >= types.LogLevel.Verbose {
     fmt.printfln("[INFO]:\t| Detaching [{}] from context tree...", id);
   }
   
@@ -205,7 +209,7 @@ _detach_node :: proc (ctx: ^types.Context, id: u16) -> types.Option(types.Node) 
   node := utils.unwrap(node_opt);
 
   if node.parent == nil {
-    if ctx.debug_level >= types.DebugLevel.Verbose {
+    if level >= types.LogLevel.Verbose {
       fmt.printfln("[WARN]:\t  --- Cannot detach unattached parent node [{}], skipping...", id);
     }
 
@@ -214,7 +218,7 @@ _detach_node :: proc (ctx: ^types.Context, id: u16) -> types.Option(types.Node) 
 
   _destroy_node(ctx, id);
 
-  if ctx.debug_level >= types.DebugLevel.Verbose {
+  if level >= types.LogLevel.Verbose {
     fmt.printfln("[INFO]:\t  --- Detached [{}] from '{}' [{}]", id, node.parent.tag, node.parent.id);
   }
 

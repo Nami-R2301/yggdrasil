@@ -20,10 +20,10 @@ import types "../types";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 _create_renderer :: proc (type: types.RendererType, bg_color: u32) -> (types.RendererError, types.Option(types.Renderer))  {
-  panic("Not Implemented");
+  panic("Unimplemented");
 }
 
 _destroy_renderer :: proc (renderer: ^types.Renderer) -> types.RendererError {
-  panic("Not Implemented");
+  panic("Unimplemented");
 }
 

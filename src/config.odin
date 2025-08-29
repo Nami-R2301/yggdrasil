@@ -1,5 +1,9 @@
 package yggdrasil;
 
+import "core:strconv";
+import "core:fmt";
+import "core:mem";
+
 import types "types";
 import utils "utils";
 
@@ -7,21 +11,35 @@ verify_config :: proc (config: map[string]types.Option(string)) -> (types.Contex
   return types.ContextError.None, config;
 }
 
-parse_config :: proc (verified_config: map[string]types.Option(string)) -> (error: types.ContextError, debug_level: types.DebugLevel, target: string) {
-  for key, &value in verified_config {
-    if key == "debug_level" {
-      switch utils.unwrap_or(value, "None") {
-        case "None":        debug_level = types.DebugLevel.None;
-        case "Normal":      debug_level = types.DebugLevel.Normal;
-        case "Verbose":     debug_level = types.DebugLevel.Verbose;
-        case "Everything":  debug_level = types.DebugLevel.Everything;
-        case:               debug_level = types.DebugLevel.None;
+parse_config :: proc (verified_config: map[string]types.Option(string)) -> (types.ContextError, map[string]string) {
+  parsed_config: map[string]string = {};
+  // Set default configs.
+  parsed_config = utils.default(parsed_config);
+
+  for key, value_opt in verified_config {
+    if utils.is_some(value_opt) {
+
+      value := utils.unwrap(value_opt);
+      switch key {
+        case "log_level":       parsed_config[key] = utils.into_str(utils.into_debug(value));
+        case "optimization": {
+          switch value {
+            case "release":     parsed_config[key] = "release";
+            case "test":        parsed_config[key] = "test";
+            case:               parsed_config[key] = "debug";
+          }
+        }
+        case "renderer": {
+          switch value {
+            case "OpenGL":      parsed_config["renderer"] = "OpenGL";
+            case:               parsed_config["renderer"] = "Vulkan";
+          }
+        }
+        case "headless": 
+          parsed_config[key] = utils.into_str(utils.into_bool(value));
       }
-    }
-    if key == "target" {
-      target = utils.unwrap_or(value, "debug"); 
     }
   }
 
-  return types.ContextError.None, debug_level, target;
+  return types.ContextError.None, parsed_config;
 }
