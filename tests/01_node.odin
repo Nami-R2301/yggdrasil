@@ -9,8 +9,9 @@ import "yggdrasil:types";
 import "yggdrasil:utils";
 
 config : map[string]types.Option(string) = {
-  "test_mode" =    utils.some("on"),
-  "debug_level" =  utils.some("None")
+  "test_mode" =  utils.some("true"),
+  "headless"  =  utils.some("true"),
+  "log_level" =  utils.some("None")
 };
 
 setup :: proc (t: ^testing.T) -> types.Context {
