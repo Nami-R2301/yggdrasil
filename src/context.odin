@@ -2,6 +2,7 @@ package yggdrasil;
 
 import "vendor:glfw";
 import "core:fmt";
+import "core:strings";
 
 import "renderer";
 import "types";
@@ -29,7 +30,7 @@ terminate :: proc () -> types.ContextError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-_create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle: ^types.Renderer = nil, config: map[string]types.Option(string)) -> (types.Error, types.Option(types.Context)) {
+_create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle: ^types.Renderer = nil, config: map[string]types.Option(string), indent: string = "  ") -> (types.Error, types.Option(types.Context)) {
 
   sanitize_error, sanitized_config := verify_config(config);
   parse_error, parsed_config := parse_config(sanitized_config);
@@ -37,11 +38,11 @@ _create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle
   level: types.LogLevel = utils.into_debug(parsed_config["log_level"]);
 
   if level != types.LogLevel.None {
-    fmt.println("[INFO]:\t| Creating context...");
+    fmt.printfln("[INFO]:{}| Creating context...", indent);
   }
 
   if level >= types.LogLevel.Verbose {
-    fmt.printfln("[INFO]:\t  --- Config: {}", parsed_config);
+    fmt.printfln("[INFO]:{0}  --- Config initialized: {1}", indent, parsed_config);
   }
 
   new_window := window_handle;
@@ -49,18 +50,18 @@ _create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle
 
   error := sanitize_error != types.ContextError.None ? sanitize_error : parse_error;
   if error != types.ContextError.None {
-    fmt.eprintfln("[ERR]:\t  --- types.ContextError creating context: {}", error);
+    fmt.eprintfln("[ERR]:{0}--- Error creating context: {}", indent, error);
     return error, utils.none(types.Context);
   } 
 
   if window_handle == nil && !utils.into_bool(parsed_config["headless"]) {
 
     if level >= types.LogLevel.Verbose {
-      fmt.println("[WARN]:\t  --- No window handle found, creating window...");
+      fmt.printfln("[WARN]:{}  --- No window handle found, creating window...", indent);
     }
 
     if !bool(glfw.Init()) {
-      fmt.println("[ERR]:\t  --- FATAL: Cannot initialize GLFW");
+      fmt.printfln("[ERR]:{}--- FATAL: Cannot initialize GLFW", indent);
       return types.ContextError.GlfwError, utils.none(types.Context);
     }
     new_window = glfw.CreateWindow(800, 600, "Default Window", nil, nil);
@@ -81,26 +82,29 @@ _create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle
     new_renderer = new_clone(utils.unwrap(renderer_opt));
   }
 
-  if level != types.LogLevel.None {
-    fmt.println("[INFO]:\t  --- Created context");
-  }
-  
-  return types.ContextError.None, utils.some(types.Context {
+  ctx := types.Context {
     window = new_window,
     root = nil,
     last_node = nil,
     cursor = {0, 0},
     renderer = new_renderer, 
     config = parsed_config,
-  });
+  };
+
+  if level != types.LogLevel.None {
+    fmt.printfln("[INFO]:{0}--- Done (\n{2} {1}\n         )", indent, utils.into_str(&ctx, "           "),
+      "          ");
+  }
+  
+  return types.ContextError.None, utils.some(ctx);
 }
 
-_reset_context :: proc (ctx: ^types.Context) -> types.ContextError {
+_reset_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.ContextError {
   assert(ctx != nil, "[ERR]:\t| types.ContextError resetting context: Context is nil!");
 
   level: types.LogLevel = utils.into_debug(ctx.config["log_level"]);
   if level >= types.LogLevel.Normal {
-    fmt.printfln("[INFO]:\t| Resetting context (%p) ... ->\n{}", ctx, utils.into_str(ctx));
+    fmt.printfln("[INFO]:{}| Resetting context (%p) ... :\n{}", indent, ctx, utils.into_str(ctx));
   }
 
   ctx.config["log_level"] = "0";
@@ -110,27 +114,23 @@ _reset_context :: proc (ctx: ^types.Context) -> types.ContextError {
   ctx.last_node = nil;
 
   if level >= types.LogLevel.Normal {
-    fmt.printfln("[INFO]:\t  --- Reset context (%p) ->\n{}", ctx, utils.into_str(ctx, "\t\t"));
+    fmt.printfln("[INFO]:{}--- Done (%p) :\n{}", indent, ctx, utils.into_str(ctx, "    "));
   }
 
   return types.ContextError.None;
 }
 
-_destroy_context :: proc (ctx: ^types.Context) -> types.ContextError {
+_destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.ContextError {
   assert(ctx != nil, "[ERR]:\t| types.ContextError resetting context: Context is nil!");
   
   level: types.LogLevel = utils.into_debug(ctx.config["log_level"]);
   if level >= types.LogLevel.Normal {
-    fmt.printfln("[INFO]:\t| Destroying context (%p) ... ->\n{}", ctx, utils.into_str(ctx));
+    fmt.printfln("[INFO]:{}| Destroying context (%p) ...", indent, ctx);
   }
 
 
-  if ctx.root != nil {
-    if level >= types.LogLevel.Verbose {
-      fmt.println("[INFO]:\t  --- Destroying nodes...");
-    }
-
-    _ = _detach_node(ctx, ctx.root.id); 
+  if ctx.root != nil { 
+    _ = _detach_node(ctx, ctx.root.id, strings.concatenate({indent, "  "})); 
   }
 
   if !utils.into_bool(ctx.config["headless"]) {
@@ -138,7 +138,7 @@ _destroy_context :: proc (ctx: ^types.Context) -> types.ContextError {
   }
 
   if level >= types.LogLevel.Verbose {
-    fmt.printfln("[INFO]:\t  --- Destroying window (%p)...", ctx.window);
+    fmt.printf("[INFO]:{}  | Destroying window (%p)...", indent, ctx.window);
   }
 
   if ctx.window != nil {
@@ -146,8 +146,9 @@ _destroy_context :: proc (ctx: ^types.Context) -> types.ContextError {
   }
 
   if level >= types.LogLevel.Normal {
-    fmt.printfln("[INFO]:\t  --- Destroyed context (%p) ->\n{}", ctx, utils.into_str(ctx, "\t\t"));
-  } 
+    fmt.println(" Done");
+    fmt.printfln("[INFO]:{}--- Done", indent);
+  }
 
   return types.ContextError.None;
 }

@@ -88,7 +88,7 @@ into_str_bool :: proc (value: bool) -> string {
   return value ? "true" : "false";
 }
 
-into_str_option :: proc ($T: typeid, opt: types.Option(T), indent: string = "\t") -> string {
+into_str_option :: proc ($T: typeid, opt: types.Option(T), indent: string = "  ") -> string {
   #partial switch &value in opt {
     case T: {
       switch &value {
@@ -108,7 +108,7 @@ into_str_option :: proc ($T: typeid, opt: types.Option(T), indent: string = "\t"
   return "None";
 }
 
-into_str_option_ref :: proc ($T: typeid, opt: types.Option(^T), indent: string = "\t") -> string {
+into_str_option_ref :: proc ($T: typeid, opt: types.Option(^T), indent: string = "  ") -> string {
   #partial switch value in opt {
     case ^T: {
       switch value {
@@ -128,18 +128,18 @@ into_str_option_ref :: proc ($T: typeid, opt: types.Option(^T), indent: string =
   return "None";
 }
 
-into_str_node :: proc (node: ^types.Node, indent: string = "\t") -> string {
+into_str_node :: proc (node: ^types.Node, indent: string = "  ") -> string {
   if node == nil {
-    return "nil";
+    return "nil (0x0)";
   }
   
   string_builder: strings.Builder = {};
-  parent := node.parent != nil ? node.parent.tag : "nil";
-  return fmt.sbprintf(&string_builder, "  [{1}] -> {{\n{0}  Parent: {2},\n{0}  id: {3}\n{0}}}", 
-    indent, node.tag, parent, node.id);
+  parent_tag := node.parent != nil ? node.parent.tag : "nil";
+  return fmt.sbprintf(&string_builder, "{{\n{0}  [{}] -> {{\n{0}  Parent: {} (%p),\n{0}  id: {}\n{0}}}", 
+    indent, node.tag, parent_tag, node.parent, node.id);
 }
 
-into_str_enum :: proc (debug: types.LogLevel, indent: string = "\t") -> string {
+into_str_enum :: proc (debug: types.LogLevel, indent: string = "  ") -> string {
   str, _ := fmt.enum_value_to_string(debug); 
   return str;
 }
@@ -148,10 +148,13 @@ into_str_enum :: proc (debug: types.LogLevel, indent: string = "\t") -> string {
 //
 // @param obj:    Object to deserialize
 // @param indent: The amount of horizontal padding to indent any inner-elements.
-into_str_ctx :: proc (ctx: ^types.Context, indent: string = "\t    ") -> string {
+into_str_ctx :: proc (ctx: ^types.Context, indent: string = "  ") -> string {
   string_builder: strings.Builder = {};
+  inner_indent := strings.concatenate({indent, "  "});
 
-  return fmt.sbprintf(&string_builder, "{0}Context: {{\n{0}  Debug Level: {1},\n{0}  Root: {{\n{0}{2}\n{0}}},\n{0}  Window: {3}," +
-      "\n{0}  Last Node: {{\n{0}{4}\n{0}}},\n{0}  Cursor: [{5},{6}],\n{0}}}", indent, into_str(ctx.config["log_level"]),
-      into_str(ctx.root, "\t\t  "), ctx.window, into_str(ctx.last_node, "\t\t  "), ctx.cursor[0], ctx.cursor[1]);
+
+  return fmt.sbprintf(&string_builder, "Context: {{\n{0}  Debug Level: {},\n{0}  Root ptr: {}," +
+    "\n{0}  Window ptr: ({}),\n{0}  Last Node ptr: {},\n{0}  Cursor: [{},{}],\n{0}}}", indent,
+    into_str(ctx.config["log_level"]), into_str(ctx.root, inner_indent), ctx.window == nil ? nil : ctx.window,
+    into_str(ctx.last_node, inner_indent), ctx.cursor[0], ctx.cursor[1]);
 }
