@@ -31,7 +31,7 @@ main :: proc () {
 
   error = ygg._attach_node(&ctx, head);
   error = ygg._attach_node(&ctx, link);
-
+  
   ygg.print_nodes(ctx.root);
 
   headless_mode: bool = utils.into_bool(ctx.config["headless"]);
