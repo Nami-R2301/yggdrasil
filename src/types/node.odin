@@ -3,10 +3,10 @@ package types;
 import "vendor:glfw";
 
 Node :: struct {
-  parent: ^Node,
-  id: u16,
-  tag: string,
-  children: map[u16]^Node,
-  style: map[u16]Option(any),
-  properties: map[u16]Option(any)
+  parent:     ^Node,
+  id:         Id,
+  tag:        string,
+  children:   map[Id]^Node,
+  style:      map[Id]Option(string),
+  properties: map[Id]Option(string)
 }
