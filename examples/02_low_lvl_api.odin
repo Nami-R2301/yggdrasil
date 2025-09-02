@@ -26,11 +26,13 @@ main :: proc () {
   assert(error == ContextError.None, "Error creating main context");
   ctx := utils.unwrap(ctx_opt);
 
-  head := ygg._create_node(&ctx, 1, "head");
-  link := ygg._create_node(&ctx, 2, "link"); 
+  head  := ygg._create_node(ctx = &ctx, id = 1, tag = "head");
+  link  := ygg._create_node(ctx = &ctx, id = 2, tag = "link"); 
+  link2 := ygg._create_node(ctx = &ctx, id = 3, tag = "link", parent = &link); 
 
   error = ygg._attach_node(&ctx, head);
   error = ygg._attach_node(&ctx, link);
+  error = ygg._attach_node(&ctx, link2);
   
   ygg.print_nodes(ctx.root);
 

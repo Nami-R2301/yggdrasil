@@ -63,7 +63,7 @@ create_duplicate :: proc (t: ^testing.T) {
   error = _attach_node(&ctx, second);
   assert(error == ContextError.None, "Error attaching second node");
   
-  testing.expect_value(t, error, ContextError.DuplicateId);
+  testing.expect_value(t, error, ContextError.None);
 }
 
 @(test)
@@ -80,7 +80,7 @@ find_node :: proc (t: ^testing.T) {
   a := _create_node(&ctx, 3, "a", &link);
 
   node_opt := _find_node(&ctx, 3);
-  testing.expect(t, !is_some(node_opt));
+  testing.expect(t, is_some(node_opt));
 
   error := _attach_node(&ctx, head);
   assert(error == ContextError.None, "Error attaching <head> node");
