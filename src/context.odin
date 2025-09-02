@@ -14,13 +14,13 @@ import "utils";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-init :: proc (window: ^glfw.WindowHandle = nil, width: types.Option(u16) = nil, height: types.Option(u16) = nil, x: types.Option(u16) = nil,
-  y: types.Option(u16) = nil) -> (types.ContextError, types.Option(types.Context)) {
+init :: proc (window: ^glfw.WindowHandle = nil, width: types.Option(types.Id) = nil, height: types.Option(types.Id) = nil, x: types.Option(types.Id) = nil,
+  y: types.Option(types.Id) = nil) -> (types.ContextError, types.Option(types.Context)) {
 
   return types.ContextError.None, utils.none(types.Context); 
 }
 
-terminate :: proc () -> types.ContextError {
+terminate :: proc (ctx: ^types.Context) -> types.ContextError {
   return types.ContextError.None;
 }
 
@@ -30,8 +30,7 @@ terminate :: proc () -> types.ContextError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-_create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle: ^types.Renderer = nil, config: map[string]types.Option(string), indent: string = "  ") -> (types.Error, types.Option(types.Context)) {
-
+_create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle: ^types.Renderer = nil, config: map[string]types.Option(string) = {}, indent: string = "  ") -> (types.Error, types.Option(types.Context)) {
   sanitize_error, sanitized_config := verify_config(config);
   parse_error, parsed_config := parse_config(sanitized_config);
  
@@ -42,7 +41,7 @@ _create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle
   }
 
   if level >= types.LogLevel.Verbose {
-    fmt.printfln("[INFO]:{0}  --- Config initialized: {1}", indent, parsed_config);
+    fmt.printfln("[INFO]:{}  --- Config initialized: {}", indent, parsed_config);
   }
 
   new_window := window_handle;
@@ -50,7 +49,7 @@ _create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle
 
   error := sanitize_error != types.ContextError.None ? sanitize_error : parse_error;
   if error != types.ContextError.None {
-    fmt.eprintfln("[ERR]:{0}--- Error creating context: {}", indent, error);
+    fmt.eprintfln("[ERR]:{}--- Error creating context: {}", indent, error);
     return error, utils.none(types.Context);
   } 
 
@@ -79,6 +78,7 @@ _create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle
     if renderer_error != types.RendererError.None {
       return types.RendererError.InitError, utils.none(types.Context);
     }
+
     new_renderer = new_clone(utils.unwrap(renderer_opt));
   }
 
