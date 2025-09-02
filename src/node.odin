@@ -36,22 +36,18 @@ import utils "utils";
 // @param style:        CSS-like style mapping to be applied upon rendering on each frame.
 // @param properties:   Data map to store information related to the node as well as override default ones (alt, disabled, type, etc...) which will mutate the node's functionality.
 // @param children:     The leaf nodes related under this one,
-_create_node :: proc (ctx: ^types.Context, id: u16, tag: string, parent: types.Option(^types.Node) = nil, style: map[u16]types.Option(any) = {}, properties: map[u16]types.Option(any) = {}, children: map[u16]^types.Node = {}, indent: string = "  ") -> types.Node {
+_create_node :: proc (ctx: ^types.Context, id: types.Id, tag: string, parent: ^types.Node = nil, style: map[types.Id]types.Option(string) = {}, properties: map[types.Id]types.Option(string) = {}, children: map[types.Id]^types.Node = {}, indent: string = "  ") -> types.Node {
     assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
 
     level: types.LogLevel = utils.into_debug(ctx.config["log_level"]);
     if level >= types.LogLevel.Verbose {
-      fmt.printf("[INFO]:{}| Creating node ( {{ tag = '{}', id = {}, parent?: {} (%p) }} )...", indent, tag, id, utils.is_some(parent) ? utils.unwrap(parent).tag : 
-        "None", parent);
+      fmt.printf("[INFO]:{}| Creating node ({{ tag = '{}', id = {}, parent?: '{}' [{}] (%p)}})...", indent, tag, id,
+        parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0, parent);
     }
 
-    parent: ^types.Node = utils.unwrap_or(parent, ctx.root); 
+    parent: ^types.Node = parent != nil ? parent : ctx.last_node; 
     if level >= types.LogLevel.Verbose {
       fmt.println(" Done");
-    }
-
-    if parent == nil {
-      parent = ctx.root != nil ? ctx.root : ctx.last_node;
     }
 
     node := types.Node {
@@ -66,12 +62,12 @@ _create_node :: proc (ctx: ^types.Context, id: u16, tag: string, parent: types.O
     return node;
 }
 
-_reset_node :: proc (ctx: ^types.Context, id: u16, indent: string = "  ") -> types.ContextError {
+_reset_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.ContextError {
   assert(ctx != nil, "[ERR]:\t| Error resetting node: Context is nil!");
   panic("Not Implemented");
 }
 
-_destroy_node :: proc (ctx: ^types.Context, id: u16, indent: string = "  ") -> types.ContextError {
+_destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.ContextError {
   assert(ctx != nil, "[ERR]:\t| Error destroying node: Context is nil!");
 
   level: types.LogLevel = utils.into_debug(ctx.config["log_level"]);
@@ -107,7 +103,7 @@ _destroy_node :: proc (ctx: ^types.Context, id: u16, indent: string = "  ") -> t
 }
 
 
-_find_node :: proc (ctx: ^types.Context, id: u16, indent: string = "  ") -> types.Option(^types.Node) {
+_find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.Option(^types.Node) {
   assert(ctx != nil, "[ERR]:\t| Error finding node: Context is nil!");
 
   log_level := utils.into_debug(ctx.config["log_level"]);
@@ -132,51 +128,50 @@ _find_node :: proc (ctx: ^types.Context, id: u16, indent: string = "  ") -> type
     return utils.some(ctx.root);
   }
 
-  found_opt := _find_child(ctx.root, id);
+  found_ptr := _find_child(ctx.root, id);
 
-  if !utils.is_some(found_opt) {
+  if found_ptr == nil {
     if log_level >= types.LogLevel.Verbose {
       fmt.printfln("\n[WARN]:{}--- Node not found", indent);
     }
 
-    return found_opt;
+    return found_ptr;
   }
 
   if log_level >= types.LogLevel.Verbose { 
-    node := utils.unwrap(found_opt);
     fmt.println(" Done");
   }
 
-  return found_opt;
+  return found_ptr != nil ? utils.some(found_ptr) : utils.none(^types.Node);
 }
 
 
 @(private)
-_find_child :: proc (current_node_ptr: ^types.Node, id: u16) -> types.Option(^types.Node) {
+_find_child :: proc (current_node_ptr: ^types.Node, id: types.Id) -> ^types.Node {
   if current_node_ptr != nil {
     for child_id, &child_ptr in current_node_ptr.children {
       if child_id == id {
-        return utils.some(child_ptr);
+        return child_ptr;
       }
 
       if child_ptr != nil && len(child_ptr.children) > 0 {
-        inner_node := _find_child(child_ptr, id);
-        if utils.is_some(inner_node) {
-          return inner_node;
+        inner_node_ptr := _find_child(child_ptr, id);
+        if inner_node_ptr != nil {
+          return inner_node_ptr;
         }
       }
     }
   }
 
-  return utils.none(^types.Node);
+  return nil;
 }
 
-_get_tree_depth :: proc (root: ^types.Node) -> u16 {
+_get_tree_depth :: proc (root: ^types.Node) -> types.Id {
   if root == nil {
     return 0;
   }
 
-  depth: u16 = u16(len(root.children));  
+  depth: types.Id = types.Id(len(root.children));  
 
   for id, &leaf_ptr in root.children {
     if leaf_ptr != nil {
@@ -198,7 +193,7 @@ _attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = " 
   assert(ctx != nil, "[ERR]:\t| Error attaching node: Context is nil!");
   
   level: types.LogLevel = utils.into_debug(ctx.config["log_level"]);
-  parent: ^types.Node = node.parent != nil ? node.parent : ctx.last_node != nil ? ctx.last_node : ctx.root;
+  parent: ^types.Node = node.parent != nil ? node.parent : ctx.last_node;
 
   if level >= types.LogLevel.Verbose {
     fmt.printfln("[INFO]:{}| Attaching node [tag = '{}', id = {} under '{}']...", indent, node.tag, node.id, parent != nil ? parent.tag : "root");
@@ -217,26 +212,26 @@ _attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = " 
       return types.ContextError.NodeNotFound;
     }
 
-    if ctx.last_node != nil && ctx.root != ctx.last_node {
-      free(ctx.last_node);
-    }
-
     new_node := new_clone(node);
     ctx.last_node = new_node;
 
     parent = utils.unwrap(parent_opt);
     ctx.last_node.parent = parent;
-    parent.children[new_node.id] = ctx.last_node;
+    parent.children[node.id] = ctx.last_node;
   }
   
   if level >= types.LogLevel.Verbose {
+    if parent != nil {
+      print_nodes(parent, strings.concatenate({indent, "  "}));
+    }
+
     fmt.printfln("[INFO]:{}--- Done (%p)", indent, ctx.last_node);
   }
 
   return types.ContextError.None
 }
 
-_detach_node :: proc (ctx: ^types.Context, id: u16, indent: string = "  ") -> types.Option(^types.Node) { 
+_detach_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.Option(^types.Node) { 
   assert(ctx != nil, "[ERR]:\t| Error detaching node: Context is nil!");
   
   level: types.LogLevel = utils.into_debug(ctx.config["log_level"]);
