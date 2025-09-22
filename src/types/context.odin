@@ -19,7 +19,7 @@ Dimension :: [2]u16;
 Context :: struct {
   window:                   glfw.WindowHandle,
   root:                     ^Node,
-  last_node:                ^Node,
+  last_node:                Option(Node),
   cursor:                   Dimension,
   renderer:                 ^Renderer,
   config:                   map[string]string,

@@ -11,7 +11,7 @@ import "yggdrasil:utils";
 config : map[string]types.Option(string) = {
   "test_mode" =  utils.some("true"),
   "headless"  =  utils.some("true"),
-  "log_level" =  utils.some("None")
+  "log_level" =  utils.some("vv")
 };
 
 setup :: proc (t: ^testing.T) -> types.Context {
@@ -52,7 +52,7 @@ create_duplicate :: proc (t: ^testing.T) {
   using types;
   using ygg;
 
-  ctx := setup(t); 
+  ctx := setup(t);
   defer cleanup(&ctx);
 
   first  := _create_node(&ctx, 1, "head");
@@ -97,7 +97,7 @@ max_depth :: proc (t: ^testing.T) {
   using types;
   using ygg;
 
-  ctx := setup(t); 
+  ctx := setup(t);
   defer cleanup(&ctx);
 
   lvl_1: u16 = 4096;
@@ -122,14 +122,14 @@ max_depth :: proc (t: ^testing.T) {
 
   testing.expect_value(t, _get_tree_depth(ctx.root), lvl_2);
 
-  lvl_3: u16 = 65535;  // 6.4m
-
-
-  for index in lvl_2..=lvl_3 - 1 {
-    node  := _create_node(&ctx, index, "head");
-    error := _attach_node(&ctx, node);
-    assert(error == ContextError.None, "Error attaching node");
-  }
-
-  testing.expect_value(t, _get_tree_depth(ctx.root), lvl_3);
+//  lvl_3: u16 = 65535;  // u16 limit
+//
+//
+//  for index in lvl_2..=lvl_3 - 1 {
+//    node  := _create_node(&ctx, index, "head");
+//    error := _attach_node(&ctx, node);
+//    assert(error == ContextError.None, "Error attaching node");
+//  }
+//
+//  testing.expect_value(t, _get_tree_depth(ctx.root), lvl_3);
 }

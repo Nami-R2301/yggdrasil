@@ -92,8 +92,9 @@ _create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle
   };
 
   if level != types.LogLevel.None {
-    fmt.printfln("[INFO]:{0}--- Done (\n{2} {1}\n         )", indent, utils.into_str(&ctx, "           "),
-      "          ");
+    str := utils.into_str(&ctx, "           ");
+    fmt.printfln("[INFO]:{0}--- Done (\n{2} {1}\n         )", indent, str, "          ");
+    delete_string(str);
   }
   
   return types.ContextError.None, utils.some(ctx);
@@ -104,7 +105,9 @@ _reset_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.Con
 
   level: types.LogLevel = utils.into_debug(ctx.config["log_level"]);
   if level >= types.LogLevel.Normal {
-    fmt.printfln("[INFO]:{}| Resetting context (%p) ... :\n{}", indent, ctx, utils.into_str(ctx));
+    str := utils.into_str(ctx);
+    fmt.printfln("[INFO]:{}| Resetting context (%p) ... :\n{}", indent, ctx, str);
+    delete_string(str);
   }
 
   ctx.config["log_level"] = "0";
@@ -114,7 +117,9 @@ _reset_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.Con
   ctx.last_node = nil;
 
   if level >= types.LogLevel.Normal {
-    fmt.printfln("[INFO]:{}--- Done (%p) :\n{}", indent, ctx, utils.into_str(ctx, "    "));
+    str := utils.into_str(ctx, "    ");
+    fmt.printfln("[INFO]:{}--- Done (%p) :\n{}", indent, ctx, str);
+    delete_string(str);
   }
 
   return types.ContextError.None;
@@ -128,10 +133,18 @@ _destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.C
     fmt.printfln("[INFO]:{}| Destroying context (%p) ...", indent, ctx);
   }
 
+  if ctx.root != nil {
+    new_indent , _ := strings.concatenate({indent, "  "});
 
-  if ctx.root != nil { 
-    _ = _detach_node(ctx, ctx.root.id, strings.concatenate({indent, "  "})); 
+    for child_id, _ in ctx.root.children {
+      _ = _destroy_node(ctx, child_id, new_indent);
+    }
+
+    delete_string(new_indent);
   }
+
+  delete_map(ctx.root.children);
+  free(ctx.root);
 
   if !utils.into_bool(ctx.config["headless"]) {
     _ = renderer._destroy_renderer(ctx.renderer);
@@ -149,6 +162,8 @@ _destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.C
     fmt.println(" Done");
     fmt.printfln("[INFO]:{}--- Done", indent);
   }
+
+  delete_map(ctx.config);
 
   return types.ContextError.None;
 }

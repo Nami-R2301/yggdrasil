@@ -1,6 +1,5 @@
 package utils;
 
-import "core:strconv";
 import "core:strings";
 import "core:fmt";
 
@@ -77,7 +76,7 @@ into_str_any :: proc (value: any) -> string {
     case string:  return v;
     case types.Option(types.Node):  return into_str_option(types.Node, v);
     case types.Option(^types.Node): return into_str_option_ref(types.Node, v);
-    case types.LogLevel:          return into_str_enum(v);
+    case types.LogLevel:            return into_str_enum(v);
     case ^types.Node:               return into_str_node(v);
     case ^types.Context:            return into_str_ctx(v);
     case:                           return "Unimplemented";
@@ -113,7 +112,7 @@ into_str_option_ref :: proc ($T: typeid, opt: types.Option(^T), indent: string =
     case ^T: {
       switch value {
         case nil:             return "None";
-        case: 
+        case:
           if T == types.Node {
             return into_str_node(value, indent);
           }
@@ -132,7 +131,7 @@ into_str_node :: proc (node: ^types.Node, indent: string = "  ") -> string {
   if node == nil {
     return "nil (0x0)";
   }
-  
+
   string_builder: strings.Builder = {};
   parent_tag := node.parent != nil ? node.parent.tag : "nil";
   return fmt.sbprintf(&string_builder, "{{\n{0}  [{}] -> {{\n{0}  Parent: {} (%p),\n{0}  id: {}\n{0}}}", 
@@ -152,9 +151,17 @@ into_str_ctx :: proc (ctx: ^types.Context, indent: string = "  ") -> string {
   string_builder: strings.Builder = {};
   inner_indent := strings.concatenate({indent, "  "});
 
+  last_node: string = "nil";
+  if is_some(ctx.last_node) {
+    node: types.Node = unwrap(ctx.last_node);
+    last_node = into_str(&node, inner_indent);
+  }
 
-  return fmt.sbprintf(&string_builder, "Context: {{\n{0}  Debug Level: {},\n{0}  Root ptr: {}," +
+  new_str := fmt.sbprintf(&string_builder, "Context: {{\n{0}  Debug Level: {},\n{0}  Root ptr: {}," +
     "\n{0}  Window ptr: ({}),\n{0}  Last Node ptr: {},\n{0}  Cursor: [{},{}],\n{0}}}", indent,
     into_str(ctx.config["log_level"]), into_str(ctx.root, inner_indent), ctx.window == nil ? nil : ctx.window,
-    into_str(ctx.last_node, inner_indent), ctx.cursor[0], ctx.cursor[1]);
+    last_node, ctx.cursor[0], ctx.cursor[1]);
+
+  delete_string(inner_indent);
+  return new_str;
 }
