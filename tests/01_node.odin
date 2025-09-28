@@ -94,12 +94,14 @@ find_node :: proc (t: ^testing.T) {
 @(test)
 max_depth :: proc (t: ^testing.T) {
   using types;
+  using utils;
   using ygg;
 
   ctx := setup(t);
   defer cleanup(&ctx);
 
-  lvl_1: u16 = 4096;
+  max_node_depth: types.Id = types.Id(_get_max_number(types.Id));
+  lvl_1: u16 = (max_node_depth / 16) + 1;
 
   for _ in 0..=lvl_1 - 1 {
     _, node  := _create_node(&ctx, "head");
@@ -121,7 +123,7 @@ max_depth :: proc (t: ^testing.T) {
 
   testing.expect_value(t, _get_node_depth(ctx.root), lvl_2);
 
-  lvl_3: types.Id = 65535;  // u16 limit
+  lvl_3: types.Id = lvl_2 * 4;
 
 
   for _ in lvl_2..=lvl_3 - 1 {
