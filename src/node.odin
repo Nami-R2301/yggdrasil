@@ -2,6 +2,7 @@ package yggdrasil;
 
 import "core:fmt";
 import "core:strings";
+
 import types "types";
 import utils "utils";
 
@@ -14,7 +15,6 @@ import utils "utils";
 begin_node :: proc () {
     panic("Not Implemented")
 }
-
 
 end_node :: proc () {
     panic("Not Implemented")
@@ -35,20 +35,22 @@ end_node :: proc () {
 //
 // @lifetime:           This function does NOT cleanup after itself like the high-level API, hence 'destroy_node(..)' is needed for each corresponding 'create_node' in the frame's scope.
 // @param ctx:          The tree containing all nodes to be processed.
-// @param id:           Unique identifier to lookup node when processing.
 // @param tag:          Which tag identifier will be used to lookup the node in the map. Tag needs to be unique, unless you are planning to override the existing node.
+// @param id:           Unique identifier to lookup node when processing.
 // @param style:        CSS-like style mapping to be applied upon rendering on each frame.
 // @param properties:   Data map to store information related to the node as well as override default ones (alt, disabled, type, etc...) which will mutate the node's functionality.
 // @param children:     The leaf nodes related under this one,
+// @return              An error if one is encountered and the node created.
 _create_node :: proc (
     ctx:        ^types.Context,
-    id:         types.Id, tag: string,
-    parent:     ^types.Node = nil,
-    style:      map[types.Id]types.Option(string) = { },
-    properties: map[types.Id]types.Option(string) = { },
-    children:   map[types.Id]types.Node = { },
-    indent:     string = "  "
-) -> types.Node {
+    tag:        string,
+    id:         types.Option(int)                   = nil,
+    parent:     ^types.Node                         = nil,
+    style:      map[types.Id]types.Option(string)   = { },
+    properties: map[types.Id]types.Option(string)   = { },
+    children:   map[types.Id]types.Node             = { },
+    indent:     string                              = "  "
+) -> (error: types.ContextError, node: types.Node) {
     assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
 
     level : types.LogLevel = utils.into_debug(ctx.config["log_level"]);
@@ -57,27 +59,36 @@ _create_node :: proc (
         parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0, parent);
     }
 
-    parent : ^types.Node = parent != nil ? parent : ctx.last_node;
+    parent: ^types.Node = parent != nil ? parent : ctx.last_node;
+    new_id: int     = utils.unwrap_or(id, 0);
+    will_overflow  := utils._check_id_overflow(new_id);
+
+    if will_overflow {
+        fmt.eprintfln("[ERR]:{}| Error creating node of ID [{}]: Node ID overflow in " +
+        "context detected! Modify [types.Id]'s alias to be a bigger type if you need a store more nodes.",
+        indent, new_id);
+        return types.ContextError.MaxIdReached, {};
+    }
+
+    if !utils.is_some(id) {
+        new_id = int(ctx.nodes_created);
+        ctx.nodes_created += 1;
+    }
 
     if level >= types.LogLevel.Verbose {
         fmt.println(" Done");
     }
 
-    node := types.Node {
+    node = types.Node {
         parent = parent,
-        id = id,
+        id = types.Id(new_id),
         tag = tag,
         children = children,
         style = style,
         properties = properties
     };
 
-    return node;
-}
-
-_reset_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.ContextError {
-    assert(ctx != nil, "[ERR]:\t| Error resetting node: Context is nil!");
-    panic("Not Implemented");
+    return types.ContextError.None, node;
 }
 
 // Deallocate a leaf and all of its children
@@ -101,28 +112,8 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
         return types.ContextError.NodeNotFound;
     }
 
-    // Stack for DFS traversal, implemented with a dynamic array.
-    to_visit := make([dynamic]^types.Node);
-    defer delete(to_visit);
-
-    // List to store the nodes in post-order (children first).
-    nodes_to_delete_ordered := make([dynamic]^types.Node);
+    nodes_to_delete_ordered := _flatten_node(ctx.root);
     defer delete(nodes_to_delete_ordered);
-
-    append(&to_visit, node_ptr);
-
-    for len(to_visit) > 0 {
-        // Pop a node from our visit stack.
-        node := pop(&to_visit);
-
-        // Append the node to our results list. We will reverse it later.
-        append(&nodes_to_delete_ordered, node);
-
-        // Add all children to the visit stack. They will be processed next.
-        for _, &child in node.children {
-            append(&to_visit, &child);
-        }
-    }
 
     // Reverse the list to get the correct post-order traversal.
     // This ensures we process children before their parents.
@@ -130,7 +121,7 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
         low := 0;
         high := len(nodes_to_delete_ordered) - 1;
         for low < high {
-            // Swap
+        // Swap
             nodes_to_delete_ordered[low],  nodes_to_delete_ordered[high] =
             nodes_to_delete_ordered[high], nodes_to_delete_ordered[low];
             low += 1;
@@ -149,7 +140,7 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
     return types.ContextError.None;
 }
 
-
+//
 _find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> ^types.Node {
     assert(ctx != nil, "[ERR]:\t| Error finding node: Context is nil!");
 
@@ -174,56 +165,20 @@ _find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") ->
         return ctx.root;
     }
 
-    found_ptr := _find_child(ctx.root, id);
+    node_ptr := _flatten_and_find_node(ctx.root, find = id);
 
-    if found_ptr == nil {
+    if node_ptr != nil && node_ptr.id == id {
         if log_level >= types.LogLevel.Verbose {
-            fmt.printfln("\n[WARN]:{}--- Node not found", indent);
+            fmt.println(" Done");
         }
-
-        return found_ptr;
+        return node_ptr;
     }
 
     if log_level >= types.LogLevel.Verbose {
-        fmt.println(" Done");
-    }
-
-    return found_ptr;
-}
-
-
-@(private)
-_find_child :: proc (current_node_ptr: ^types.Node, id: types.Id) -> ^types.Node {
-    if current_node_ptr != nil {
-        for child_id, &child_ptr in current_node_ptr.children {
-            if child_id == id {
-                return &child_ptr;
-            }
-
-            if &child_ptr != nil && len(child_ptr.children) > 0 {
-                inner_node_ptr := _find_child(&child_ptr, id);
-                return inner_node_ptr;
-            }
-        }
+        fmt.printfln("\n[WARN]:{}--- Node not found", indent);
     }
 
     return nil;
-}
-
-_get_tree_depth :: proc (root: ^types.Node) -> types.Id {
-    if root == nil {
-        return 0;
-    }
-
-    depth : types.Id = types.Id(len(root.children));
-
-    for id, &leaf in root.children {
-        if leaf.parent != nil {
-            depth += _get_tree_depth(&leaf);
-        }
-    }
-
-    return depth;
 }
 
 // Low-level API to attach a node to the current ui tree. Benefit of this function over its high-level counterparts 'begin_node(...)' is the ability to explicitely
@@ -320,4 +275,89 @@ _detach_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") 
     }
 
     return node_ptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Helper to query the size of the entire node tree starting from the root provided from root to last inner leaf.
+//
+// @param
+_get_node_depth :: proc (root: ^types.Node) -> types.Id {
+    if root == nil {
+        return 0;
+    }
+
+    depth : types.Id = types.Id(len(root.children));
+
+    for id, &leaf in root.children {
+        if leaf.parent != nil {
+            depth += _get_node_depth(&leaf);
+        }
+    }
+
+    return depth;
+}
+
+// Helper to flatten all map nodes into a single dynamic sorted array, useful when you need to apply some
+// uniform logic or transformation onto each node and their inner nodes.
+//
+// @param  node_ptr:    Which node to flatten.
+// @return               The flattened list containing the node provided and all of its children.
+_flatten_node :: proc (start_ptr: ^types.Node, stop_at: types.Option(types.Id) = nil) -> [dynamic]^types.Node {
+    end_bound: types.Id = utils.unwrap_or(stop_at, types.Id(utils._get_max_number(types.Id)))
+    // Stack for DFS traversal, implemented with a dynamic array.
+    to_visit := make([dynamic]^types.Node);
+    defer delete(to_visit);
+
+    // Flatten map to store the nodes in post-order (children first).
+    flat_nodes := make([dynamic]^types.Node);
+
+    append(&to_visit, start_ptr);
+
+    // Dynamically grow the flat list of nodes, and only stop when all inner nodes have been explored.
+    for len(to_visit) > 0 && len(to_visit) < int(end_bound) {
+        node := pop(&to_visit);
+        append(&flat_nodes, node);
+
+        for _, &child in node.children {
+            append(&to_visit, &child);
+        }
+    }
+
+    return flat_nodes;
+}
+
+// Helper to flatten all map nodes into a single dynamic sorted array, and use that to find the node id provided.
+//
+// @param  start_ptr:    Which node to flatten.
+// @return               The node to find (nil if not found).
+_flatten_and_find_node :: proc (start_ptr: ^types.Node, find: types.Id) -> ^types.Node {
+// Stack for DFS traversal, implemented with a dynamic array.
+    to_visit := make([dynamic]^types.Node);
+    defer delete(to_visit);
+
+    // Flatten map to store the nodes in post-order (children first).
+    flat_nodes := make([dynamic]^types.Node);
+    defer delete_dynamic_array(flat_nodes);
+
+    append(&to_visit, start_ptr);
+
+    // Dynamically grow the flat list of nodes, and only stop when all inner nodes have been explored.
+    for len(to_visit) > 0 {
+        node := pop(&to_visit);
+        append(&flat_nodes, node);
+        if find == node.id {
+            return node;
+        }
+
+        for _, &child in node.children {
+            append(&to_visit, &child);
+        }
+    }
+
+    return nil;
 }

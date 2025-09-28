@@ -15,7 +15,8 @@ main :: proc () {
   temp_config: map[string]Option(string) = {};
    
    // Can specify 0-4 for verbosity, 1 being normal and 4 being everything, 0 to disable. Defaults to normal.
-  temp_config["log_level"]    = utils.some("v");
+  temp_config["log_level"]    = utils.some("vvv");
+  temp_config["log_file"]     = utils.some("logs.txt");
   // indicate if this app requires a renderer or not (true/false). Defaults to false.
   temp_config["headless"]     = utils.some("true");
   temp_config["optimization"] = utils.some("release");
@@ -26,15 +27,16 @@ main :: proc () {
   assert(error == ContextError.None, "Error creating main context");
   ctx := utils.unwrap(ctx_opt);
 
-  head  := ygg._create_node(ctx = &ctx, id = 1, tag = "head");
-  link  := ygg._create_node(ctx = &ctx, id = 2, tag = "link");
-  link2 := ygg._create_node(ctx = &ctx, id = 3, tag = "link");
+  _, head  := ygg._create_node(&ctx, tag = "head");
+  _, link  := ygg._create_node(&ctx, tag = "link");
+  _, link2 := ygg._create_node(&ctx, tag = "link", parent = &head);
 
   error = ygg._attach_node(&ctx, head);
   error = ygg._attach_node(&ctx, link);
   error = ygg._attach_node(&ctx, link2);
-  
-  ygg.print_nodes(ctx.root);
+
+  node := ygg._find_node(&ctx, 2);
+  ygg.print_nodes(node);
 
   headless_mode: bool = utils.into_bool(ctx.config["headless"]);
   if !headless_mode {

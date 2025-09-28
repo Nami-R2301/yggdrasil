@@ -24,7 +24,8 @@ Context :: struct {
   renderer:                 ^Renderer,
   config:                   map[string]string,
   mouseEventHandlers:       map[Id]MouseEvent, 
-  keyboardEventHandlers:    map[Id]KeyboardEvent
+  keyboardEventHandlers:    map[Id]KeyboardEvent,
+  nodes_created:            Id
 }
 
 // Errors regarding the overall app context.
@@ -36,4 +37,5 @@ ContextError :: enum u8 {
   UinitializedContext,
   DuplicateId,
   NodeNotFound,
+  MaxIdReached
 }

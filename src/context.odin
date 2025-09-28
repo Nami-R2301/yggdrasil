@@ -89,6 +89,7 @@ _create_context :: proc (window_handle: glfw.WindowHandle = nil, renderer_handle
     cursor = {0, 0},
     renderer = new_renderer, 
     config = parsed_config,
+    nodes_created = 0
   };
 
   if level != types.LogLevel.None {
