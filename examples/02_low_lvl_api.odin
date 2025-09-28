@@ -15,7 +15,7 @@ main :: proc () {
   temp_config: map[string]Option(string) = {};
    
    // Can specify 0-4 for verbosity, 1 being normal and 4 being everything, 0 to disable. Defaults to normal.
-  temp_config["log_level"]    = utils.some("vvv");
+  temp_config["log_level"]    = utils.some("v");
   // indicate if this app requires a renderer or not (true/false). Defaults to false.
   temp_config["headless"]     = utils.some("true");
   temp_config["optimization"] = utils.some("release");
@@ -27,8 +27,8 @@ main :: proc () {
   ctx := utils.unwrap(ctx_opt);
 
   head  := ygg._create_node(ctx = &ctx, id = 1, tag = "head");
-  link  := ygg._create_node(ctx = &ctx, id = 2, tag = "link"); 
-  link2 := ygg._create_node(ctx = &ctx, id = 3, tag = "link", parent = &link); 
+  link  := ygg._create_node(ctx = &ctx, id = 2, tag = "link");
+  link2 := ygg._create_node(ctx = &ctx, id = 3, tag = "link");
 
   error = ygg._attach_node(&ctx, head);
   error = ygg._attach_node(&ctx, link);

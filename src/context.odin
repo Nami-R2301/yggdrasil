@@ -129,22 +129,18 @@ _destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.C
   assert(ctx != nil, "[ERR]:\t| types.ContextError resetting context: Context is nil!");
   
   level: types.LogLevel = utils.into_debug(ctx.config["log_level"]);
+  defer delete_map(ctx.config);
+
   if level >= types.LogLevel.Normal {
     fmt.printfln("[INFO]:{}| Destroying context (%p) ...", indent, ctx);
   }
 
   if ctx.root != nil {
     new_indent , _ := strings.concatenate({indent, "  "});
-
-    for child_id, _ in ctx.root.children {
-      _ = _destroy_node(ctx, child_id, new_indent);
-    }
-
+    _ = _destroy_node(ctx, ctx.root.id, new_indent);
     delete_string(new_indent);
+    free(ctx.root);
   }
-
-  delete_map(ctx.root.children);
-  free(ctx.root);
 
   if !utils.into_bool(ctx.config["headless"]) {
     _ = renderer._destroy_renderer(ctx.renderer);
@@ -162,8 +158,6 @@ _destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.C
     fmt.println(" Done");
     fmt.printfln("[INFO]:{}--- Done", indent);
   }
-
-  delete_map(ctx.config);
 
   return types.ContextError.None;
 }

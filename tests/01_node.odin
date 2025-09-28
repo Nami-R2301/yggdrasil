@@ -11,7 +11,7 @@ import "yggdrasil:utils";
 config : map[string]types.Option(string) = {
   "test_mode" =  utils.some("true"),
   "headless"  =  utils.some("true"),
-  "log_level" =  utils.some("vv")
+  "log_level" =  utils.some("v")
 };
 
 setup :: proc (t: ^testing.T) -> types.Context {
@@ -62,7 +62,7 @@ create_duplicate :: proc (t: ^testing.T) {
   assert(error == ContextError.None, "Error attaching first node");
   error = _attach_node(&ctx, second);
   assert(error == ContextError.None, "Error attaching second node");
-  
+
   testing.expect_value(t, error, ContextError.None);
 }
 
@@ -79,17 +79,17 @@ find_node :: proc (t: ^testing.T) {
   link := _create_node(&ctx, 2, "link", &head);
   a := _create_node(&ctx, 3, "a", &link);
 
-  node_opt := _find_node(&ctx, 3);
-  testing.expect(t, is_some(node_opt));
+  node_ptr := _find_node(&ctx, 3);
+  testing.expect(t, node_ptr == nil, "A tag should not be found, since it is not attached to the tree");
 
   error := _attach_node(&ctx, head);
-  assert(error == ContextError.None, "Error attaching <head> node");
+  testing.expect(t, error == ContextError.None, "Error attaching <head> node");
   
   error = _attach_node(&ctx, link);
-  assert(error == ContextError.None, "Error attaching <link> node");
+  testing.expect(t, error == ContextError.None, "Error attaching <link> node");
   
   error = _attach_node(&ctx, a);
-  assert(error == ContextError.None, "Error attaching <a> node");
+  testing.expect(t, error == ContextError.None, "Error attaching <a> node");
 }
 
 @(test)
@@ -111,7 +111,7 @@ max_depth :: proc (t: ^testing.T) {
   testing.expect_value(t, _get_tree_depth(ctx.root), lvl_1);
 
   lvl_2: u16 = lvl_1 * 4;   // 16k
-  
+
 
   for index in lvl_1..=lvl_2 - 1 {
     node  := _create_node(&ctx, index, "head");
@@ -122,14 +122,46 @@ max_depth :: proc (t: ^testing.T) {
 
   testing.expect_value(t, _get_tree_depth(ctx.root), lvl_2);
 
-//  lvl_3: u16 = 65535;  // u16 limit
-//
-//
-//  for index in lvl_2..=lvl_3 - 1 {
-//    node  := _create_node(&ctx, index, "head");
-//    error := _attach_node(&ctx, node);
-//    assert(error == ContextError.None, "Error attaching node");
-//  }
-//
-//  testing.expect_value(t, _get_tree_depth(ctx.root), lvl_3);
+  lvl_3: u16 = 65535;  // u16 limit
+
+
+  for index in lvl_2..=lvl_3 - 1 {
+    node  := _create_node(&ctx, index, "head");
+    error := _attach_node(&ctx, node);
+    assert(error == ContextError.None, "Error attaching node");
+  }
+
+  testing.expect_value(t, _get_tree_depth(ctx.root), lvl_3);
+}
+
+@(test)
+simple :: proc (t: ^testing.T) {
+  using types;
+
+  // Manual configs. Specify 'none' for any config values you wish to leave/reset default.
+  temp_config: map[string]Option(string) = {};
+
+  // Can specify 0-4 for verbosity, 1 being normal and 4 being everything, 0 to disable. Defaults to normal.
+  temp_config["log_level"]    = utils.some("");
+  // indicate if this app requires a renderer or not (true/false). Defaults to false.
+  temp_config["headless"]     = utils.some("true");
+  temp_config["optimization"] = utils.some("release");
+  temp_config["cache"]        = utils.none(string);
+  temp_config["renderer"]     = utils.none(string);
+
+  error, ctx_opt := ygg._create_context(config = temp_config);
+  assert(error == ContextError.None, "Error creating main context");
+  ctx := utils.unwrap(ctx_opt);
+
+  head  := ygg._create_node(ctx = &ctx, id = 1, tag = "head");
+  link  := ygg._create_node(ctx = &ctx, id = 2, tag = "link");
+  link2 := ygg._create_node(ctx = &ctx, id = 3, tag = "link", parent = &link);
+
+  error = ygg._attach_node(&ctx, head);
+  error = ygg._attach_node(&ctx, link);
+  error = ygg._attach_node(&ctx, link2);
+
+  delete_map(temp_config);
+
+  defer ygg._destroy_context(&ctx);
 }

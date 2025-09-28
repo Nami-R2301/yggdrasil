@@ -152,9 +152,8 @@ into_str_ctx :: proc (ctx: ^types.Context, indent: string = "  ") -> string {
   inner_indent := strings.concatenate({indent, "  "});
 
   last_node: string = "nil";
-  if is_some(ctx.last_node) {
-    node: types.Node = unwrap(ctx.last_node);
-    last_node = into_str(&node, inner_indent);
+  if ctx.last_node != nil {
+    last_node = into_str(ctx.last_node, inner_indent);
   }
 
   new_str := fmt.sbprintf(&string_builder, "Context: {{\n{0}  Debug Level: {},\n{0}  Root ptr: {}," +

@@ -57,14 +57,8 @@ _create_node :: proc (
         parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0, parent);
     }
 
-    last_node: ^types.Node = nil;
+    parent : ^types.Node = parent != nil ? parent : ctx.last_node;
 
-    if utils.is_some(ctx.last_node) {
-        node: types.Node = utils.unwrap(ctx.last_node);
-        last_node = &node;
-    }
-
-    parent : ^types.Node = parent != nil ? parent : last_node;
     if level >= types.LogLevel.Verbose {
         fmt.println(" Done");
     }
@@ -97,25 +91,56 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
     }
 
     new_indent, _ := strings.concatenate({ indent, "  " });
-    node_opt := _find_node(ctx, id, new_indent);
+    node_ptr := _find_node(ctx, id, new_indent);
+    delete_string(new_indent);
 
-    if !utils.is_some(node_opt) {
+    if node_ptr == nil {
         if level >= types.LogLevel.Normal {
             fmt.eprintfln("[ERR]:{}--- Error destroying node: types.Node [{}] not found", indent, id);
         }
-        delete_string(new_indent);
         return types.ContextError.NodeNotFound;
     }
 
-    node := utils.unwrap(node_opt);
+    // Stack for DFS traversal, implemented with a dynamic array.
+    to_visit := make([dynamic]^types.Node);
+    defer delete(to_visit);
 
-    // Cleanup after ourselves
-    for child_id, _ in node.children {
-        _ = _destroy_node(ctx, child_id, indent);
+    // List to store the nodes in post-order (children first).
+    nodes_to_delete_ordered := make([dynamic]^types.Node);
+    defer delete(nodes_to_delete_ordered);
+
+    append(&to_visit, node_ptr);
+
+    for len(to_visit) > 0 {
+        // Pop a node from our visit stack.
+        node := pop(&to_visit);
+
+        // Append the node to our results list. We will reverse it later.
+        append(&nodes_to_delete_ordered, node);
+
+        // Add all children to the visit stack. They will be processed next.
+        for _, &child in node.children {
+            append(&to_visit, &child);
+        }
     }
 
-    delete_string(new_indent);
-    delete_map(node.children);
+    // Reverse the list to get the correct post-order traversal.
+    // This ensures we process children before their parents.
+    {
+        low := 0;
+        high := len(nodes_to_delete_ordered) - 1;
+        for low < high {
+            // Swap
+            nodes_to_delete_ordered[low],  nodes_to_delete_ordered[high] =
+            nodes_to_delete_ordered[high], nodes_to_delete_ordered[low];
+            low += 1;
+            high -= 1;
+        }
+    }
+
+    for node_to_delete in nodes_to_delete_ordered {
+        delete_map(node_to_delete.children);
+    }
 
     if level >= types.LogLevel.Verbose {
         fmt.printfln("[INFO]:{}--- Done", indent);
@@ -125,7 +150,7 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
 }
 
 
-_find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.Option(^types.Node) {
+_find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> ^types.Node {
     assert(ctx != nil, "[ERR]:\t| Error finding node: Context is nil!");
 
     log_level := utils.into_debug(ctx.config["log_level"]);
@@ -138,7 +163,7 @@ _find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") ->
         if log_level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
-        return utils.none(^types.Node);
+        return ctx.root;
     }
 
     if id == ctx.root.id {
@@ -146,7 +171,7 @@ _find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") ->
             fmt.println(" Done");
         }
 
-        return utils.some(ctx.root);
+        return ctx.root;
     }
 
     found_ptr := _find_child(ctx.root, id);
@@ -163,7 +188,7 @@ _find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") ->
         fmt.println(" Done");
     }
 
-    return found_ptr != nil ? utils.some(found_ptr) : utils.none(^types.Node);
+    return found_ptr;
 }
 
 
@@ -177,9 +202,7 @@ _find_child :: proc (current_node_ptr: ^types.Node, id: types.Id) -> ^types.Node
 
             if &child_ptr != nil && len(child_ptr.children) > 0 {
                 inner_node_ptr := _find_child(&child_ptr, id);
-                if inner_node_ptr.parent != nil {
-                    return inner_node_ptr;
-                }
+                return inner_node_ptr;
             }
         }
     }
@@ -214,46 +237,45 @@ _attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = " 
     assert(ctx != nil, "[ERR]:\t| Error attaching node: Context is nil!");
 
     level : types.LogLevel = utils.into_debug(ctx.config["log_level"]);
-    last_node: ^types.Node = nil;
 
-    if utils.is_some(ctx.last_node) {
-        node: types.Node = utils.unwrap(ctx.last_node);
-        last_node = &node;
-    }
-
-    parent : ^types.Node = node.parent != nil ? node.parent : last_node;
+    parent_ptr : ^types.Node = node.parent != nil ? node.parent : ctx.last_node;
+    new_node   : types.Node  = node;
 
     if level >= types.LogLevel.Verbose {
-        fmt.printfln("[INFO]:{}| Attaching node [tag = '{}', id = {} under '{}'] ...", indent, node.tag, node.id, parent != nil ? parent.tag : "root");
+        fmt.printfln("[INFO]:{}| Attaching node [tag = '{}', id = {} under '{}'] ...", indent, node.tag, node.id,
+        parent_ptr != nil ? parent_ptr.tag : "nil");
     }
 
-    if parent == nil {
+    if parent_ptr == nil {
+        fmt.printfln("[WARN]:{}| No root found, setting '{}' as new root ...", indent, node.tag);
         ctx.root = new_clone(node);
-        ctx.last_node = utils.some(ctx.root^);
-    } else {
+        new_node   = ctx.root^;
+        ctx.last_node = ctx.root;
+
+    } else if ctx.last_node != parent_ptr {
         new_indent, _ := strings.concatenate({ indent, "  " });
-        parent_opt := _find_node(ctx, parent.id, new_indent);
+        parent_ptr = _find_node(ctx, parent_ptr.id, new_indent);
         delete_string(new_indent);
 
-        if !utils.is_some(parent_opt) {
+        if parent_ptr == nil {
             if level >= types.LogLevel.Normal {
-                fmt.eprintfln("[ERR]:{}--- Error when attaching node: Parent not found", indent);
+                fmt.eprintfln("[WARN]:{}--- Node parent is nil, attaching to root instead ...", indent);
             }
-            return types.ContextError.NodeNotFound;
+
+            parent_ptr = ctx.root;
         }
+    }
 
-        parent = utils.unwrap(parent_opt);
-        new_node := node;
-        new_node.parent = parent;
-        parent.children[node.id] = new_node;
-
-        ctx.last_node = utils.some(new_node);
+    new_node.parent = parent_ptr;
+    if parent_ptr != nil {
+        parent_ptr.children[node.id] = new_node;
+        ctx.last_node = &parent_ptr.children[node.id];
     }
 
     if level >= types.LogLevel.Verbose {
-        if parent != nil {
+        if parent_ptr != nil {
             new_indent, _ := strings.concatenate({ indent, "  " });
-            print_nodes(parent, new_indent);
+            print_nodes(parent_ptr, new_indent);
             delete_string(new_indent);
         }
 
@@ -279,15 +301,11 @@ _detach_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") 
     }
 
     new_indent, _ := strings.concatenate({ indent, "  " });
-    node_opt := _find_node(ctx, id, new_indent);
+    defer delete_string(new_indent);
 
-    if !utils.is_some(node_opt) {
-        return utils.none(^types.Node);
-    }
+    node_ptr := _find_node(ctx, id, new_indent);
 
-    node := utils.unwrap(node_opt);
-
-    if node == nil {
+    if node_ptr == nil {
         if level >= types.LogLevel.Verbose {
             fmt.printfln("[WARN]:{}--- Cannot detach nil node, skipping ...", indent);
         }
@@ -296,11 +314,10 @@ _detach_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") 
     }
 
     _destroy_node(ctx, id, new_indent);
-    delete_string(new_indent);
 
     if level >= types.LogLevel.Verbose {
         fmt.printfln("[INFO]:{}--- Done", indent);
     }
 
-    return node;
+    return node_ptr;
 }

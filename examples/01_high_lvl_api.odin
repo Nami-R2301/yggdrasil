@@ -1,4 +1,4 @@
 package examples;
 
-main :: proc () {
-}
+//main :: proc () {
+//}
