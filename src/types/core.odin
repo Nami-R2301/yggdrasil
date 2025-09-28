@@ -3,6 +3,7 @@ package types;
 // Aggregate all errors into this type when a procedure might return multiple types of errors.
 Error :: union {
   ContextError,
+  WindowError,
   RendererError,
   ConfigError,
 }

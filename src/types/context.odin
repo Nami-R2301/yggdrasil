@@ -1,7 +1,5 @@
 package types;
 
-import "vendor:glfw";
-
 // NOTE: The u16 encoding limit for IDs is a deliberate choice, since I deemed this library far too unoptimized to 
 // even fathom having more that 2^16 nodes in a tree at a time. Main bottlenecks here are searching and dispatching
 // custom event handling on a per-node basis. So in theory, if anyone wants to extend this library and can address
@@ -17,7 +15,7 @@ Dimension :: [2]u16;
 // the assignment of IDs to your nodes is order sensitive and if you encounter misordering or certain nodes being 
 // prioritized over others, you might have a non-ascending ID causing this.
 Context :: struct {
-  window:                   glfw.WindowHandle,
+  window:                   ^Window,
   root:                     ^Node,
   last_node:                ^Node,
   cursor:                   Dimension,
@@ -33,9 +31,9 @@ ContextError :: enum u8 {
   None = 0,
   InvalidContext,
   InvalidWindow,
-  GlfwError,
   UinitializedContext,
   DuplicateId,
   NodeNotFound,
-  MaxIdReached
+  MaxIdReached,
+  HeadlessMode,  // When the user tries to create or use a window when they are in headless mode.
 }

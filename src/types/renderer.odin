@@ -8,8 +8,8 @@ Renderer :: struct {
   textures: []u8
 }
 
-RendererError :: enum {
-  None,
+RendererError :: enum u8 {
+  None = 0,
   InvalidAPI,
   InvalidBinding,
   InitError,

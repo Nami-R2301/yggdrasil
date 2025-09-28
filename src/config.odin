@@ -1,45 +1,76 @@
 package yggdrasil;
 
-import "core:strconv";
-import "core:fmt";
-import "core:mem";
-
 import types "types";
-import utils "utils";
+import utils "utils"
 
-verify_config :: proc (config: map[string]types.Option(string)) -> (types.ContextError, map[string]types.Option(string)) {
-  return types.ContextError.None, config;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////// LOW LEVEL API //////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Low-level API to sanitize a config file and auto-generate default values for any option missing or set
+// to none.
+//
+// @param   *config*: An optional map of features that will configure the current context. Keys with none values
+//                    will revert to defaults. Will read the config.toml file at the root if no explicit
+//                    config is provided.
+// @param   *indent*: The depth of the indent for all logs within this function.
+// @return  A sanitized version of the config provided as input.
+_sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(string)) = nil, indent: string = "  ") -> (types.ConfigError, types.Option(map[string]string)) {
+    new_config := utils.default_config();
+    config_read: map[string]types.Option(string) = {};
+    if !utils.is_some(config_opt) {
+        // Attempt to read from toml file.
+        error, config_toml := _read_config();
+        if error != types.ConfigError.None {
+            return error, utils.none(map[string]string);
+        }
+        config_read = utils.unwrap(config_toml);
+    }
+
+    for key, value_opt in config_read {
+        if utils.is_some(value_opt) {
+            value := utils.unwrap(value_opt);
+            switch key {
+                case "log_level":   new_config[key] = utils.into_str(utils.into_debug(value));
+                case "log_file":
+                    switch value {
+                        case "":    new_config[key] = "n/a";
+                        case:       new_config[key] = value;
+                    }
+                case "optimization": {
+                    switch value {
+                        case "speed":   new_config[key] = "speed";
+                        case "memory":  new_config[key] = "memory";
+                        case:           new_config[key] = "debug";
+                    }
+                }
+                case "renderer": {
+                    switch value {
+                        case "Vulkan":  new_config[key] = "Vulkan";
+                        case:           new_config[key] = "OpenGL";
+                    }
+                }
+                case "cache": {
+                    new_config[key] = utils.into_str(utils.into_bool(value));
+                }
+                case "headless":
+                    new_config[key] = utils.into_str(utils.into_bool(value));
+                }
+        }
+    }
+    return types.ConfigError.None, utils.some(new_config);
 }
 
-parse_config :: proc (verified_config: map[string]types.Option(string)) -> (types.ContextError, map[string]string) {
-  parsed_config: map[string]string = {};
-  // Set default configs.
-  parsed_config = utils.default(parsed_config);
-
-  for key, value_opt in verified_config {
-    if utils.is_some(value_opt) {
-
-      value := utils.unwrap(value_opt);
-      switch key {
-        case "log_level":       parsed_config[key] = utils.into_str(utils.into_debug(value));
-        case "optimization": {
-          switch value {
-            case "release":     parsed_config[key] = "release";
-            case "test":        parsed_config[key] = "test";
-            case:               parsed_config[key] = "debug";
-          }
-        }
-        case "renderer": {
-          switch value {
-            case "OpenGL":      parsed_config["renderer"] = "OpenGL";
-            case:               parsed_config["renderer"] = "Vulkan";
-          }
-        }
-        case "headless": 
-          parsed_config[key] = utils.into_str(utils.into_bool(value));
-      }
-    }
-  }
-
-  return types.ContextError.None, parsed_config;
+// Low-level API to attempt to read the yggdrasil config toml file and return its options with a key-value
+// map, where any features missing in the file, will result in none. When parsed, they will default to
+// their respective default values.
+//
+// @param   *indent*:   The depth of the indent for all logs within this function.
+// @return  An error if one occurred and an optional map of key-value pairs corresponding to features
+//          and options available for configuring the context if no errors occurred.
+// TODO: Read from file.
+_read_config :: proc (indent: string = "  ") ->  (types.ConfigError, types.Option(map[string]types.Option(string))) {
+    panic("Unimplemented");
 }

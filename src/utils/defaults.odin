@@ -1,6 +1,9 @@
 package utils;
 
+import "vendor:glfw";
+
 import "../types";
+import "../utils";
 
 default :: proc {
   default_bool,
@@ -63,7 +66,7 @@ default_log_level :: proc (log: types.LogLevel) -> types.LogLevel {
   return types.LogLevel.Normal;
 }
 
-default_config :: proc (config: map[string]string) -> map[string]string {
+default_config :: proc (config: map[string]string = {}) -> map[string]string {
   default: map[string]string = {};
 
   default["log_level"]    = "v";
@@ -75,4 +78,28 @@ default_config :: proc (config: map[string]string) -> map[string]string {
   default["cache"]        = "true";
 
   return default;
+}
+
+default_window :: proc (window: types.Window = {}) -> types.Window {
+  new_window: types.Window = {};
+  glfw_handle := glfw.CreateWindow(800, 600, "Default Window", nil, nil);
+
+  glfw.WindowHint_bool(glfw.OPENGL_DEBUG_CONTEXT, true);
+  glfw.WindowHint(glfw.CLIENT_API, glfw.OPENGL_API);
+  glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE);
+  glfw.WindowHint(glfw.VERSION_MAJOR, 3);
+  glfw.WindowHint(glfw.VERSION_MINOR, 3);
+
+  glfw.WindowHint(glfw.REFRESH_RATE, -1);
+
+  glfw.SwapInterval(1);
+  glfw.MakeContextCurrent(glfw_handle);
+
+  new_window.glfw_handle = glfw_handle;
+  new_window.title = "Yggdrasil";
+  new_window.dimensions = { 800, 600 };
+  new_window.offset = { 0, 0 };
+  new_window.refresh_rate = utils.none(u16);
+
+  return new_window;
 }

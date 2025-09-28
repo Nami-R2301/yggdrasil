@@ -5,44 +5,52 @@ import "vendor:glfw";
 import "core:fmt";
 
 import ygg "../src";
-import "yggdrasil:utils";
-import "yggdrasil:types";
+import utils "yggdrasil:utils";
+import types "yggdrasil:types";
 
 main :: proc () {
   using types;
+  using utils;
 
-  // Manual configs. Specify 'none' for any config values you wish to leave/reset default.
-  temp_config: map[string]Option(string) = {};
-   
-   // Can specify 0-4 for verbosity, 1 being normal and 4 being everything, 0 to disable. Defaults to normal.
-  temp_config["log_level"]    = utils.some("vvv");
-  temp_config["log_file"]     = utils.some("logs.txt");
-  // indicate if this app requires a renderer or not (true/false). Defaults to false.
-  temp_config["headless"]     = utils.some("true");
-  temp_config["optimization"] = utils.some("release");
-  temp_config["cache"]        = utils.none(string);
-  temp_config["renderer"]     = utils.none(string);
+  // Manual configs.
+  temp_config: map[string]string = {};
+  defer delete_map(temp_config);
 
-  error, ctx_opt := ygg._create_context(config = temp_config);
+  temp_config["log_level"]    = "vvv";      // Log Verbosity. Defaults to normal or 'v'.
+  temp_config["log_file"]     = "logs.txt"; // Where do we log the app's logs.
+  temp_config["headless"]     = "";         // If we plan on using a window. Defaults to a falsy value.
+  temp_config["optimization"] = "speed";    // Optimization level. This will disable stdout logging and batch renderer commands if supported for speed. Defaults to debug.
+  temp_config["cache"]        = "";         // If we want to enable caching of nodes. Defaults to a truthy value.
+  temp_config["renderer"]     = "";         // If we plan on rendering nodes. Defaults to a truthy value.
+
+  window_error, window_opt := ygg._create_window("Low Level Example");
+  assert(window_error == WindowError.None, "Error creating window");
+  window_handle := unwrap(window_opt);
+
+//  renderer_error, renderer_opt := ygg._create_renderer(bg_color = 0x222222);
+//  assert(renderer_error == RendererError.None, "Error creating renderer");
+//  renderer_handle := unwrap(renderer_opt);
+
+  error, ctx_opt := ygg._create_context(window_handle = &window_handle, config = temp_config);
   assert(error == ContextError.None, "Error creating main context");
-  ctx := utils.unwrap(ctx_opt);
+  ctx := unwrap(ctx_opt);
 
-  _, head  := ygg._create_node(&ctx, tag = "head");
-  _, link  := ygg._create_node(&ctx, tag = "link");
-  _, link2 := ygg._create_node(&ctx, tag = "link", parent = &head);
+  head  := ygg._create_node(&ctx, tag = "head");
+  link  := ygg._create_node(&ctx, tag = "link");
+  link2 := ygg._create_node(&ctx, tag = "link", parent = &head);
 
   error = ygg._attach_node(&ctx, head);
   error = ygg._attach_node(&ctx, link);
   error = ygg._attach_node(&ctx, link2);
 
-  node := ygg._find_node(&ctx, 2);
+  node := ygg.find_node(&ctx, 2);
   ygg.print_nodes(node);
 
-  headless_mode: bool = utils.into_bool(ctx.config["headless"]);
+  headless_mode: bool = into_bool(ctx.config["headless"]);
   if !headless_mode {
-    for bool(!glfw.WindowShouldClose(ctx.window)) {
+    for bool(!glfw.WindowShouldClose(ctx.window.glfw_handle)) {
       glfw.PollEvents();
-      glfw.SwapBuffers(ctx.window);
+      glfw.SwapBuffers(ctx.window.glfw_handle);
     }
   }
 
