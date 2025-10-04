@@ -1,4 +1,4 @@
-package yggdrasil;
+package ygg;
 
 import "core:fmt";
 import "core:strings";
@@ -12,12 +12,220 @@ import utils "utils";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-begin_node :: proc () {
-    panic("Not Implemented")
+begin_node :: proc (
+    ctx:        ^types.Context,
+    tag:        string,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    using types;
+
+    assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
+
+    node: Node;
+    switch tag {
+        case "html", "root", "main":    node = _create_node(ctx, tag = tag, id = 0);
+        case "a":                       node = a(ctx, is_inline, style, properties);
+        case "head":                    node = head(ctx, is_inline, style, properties);
+        case "img", "Image":            node = img(ctx, is_inline, style, properties);
+        case "input":                   node = input(ctx, is_inline, style, properties);
+        case "li":                      node = li(ctx, is_inline, style, properties);
+        case "link":                    node = link(ctx, is_inline, style, properties);
+        case "meta":                    node = meta(ctx, is_inline, style, properties);
+        case "nav":                     node = nav(ctx, is_inline, style, properties);
+        case "ol":                      node = ol(ctx, is_inline, style, properties);
+        case "p":                       node = p(ctx, is_inline, style, properties);
+        case "script":                  node = script(ctx, is_inline, style, properties);
+        case "span":                    node = span(ctx, is_inline, style, properties);
+        case "table":                   node = table(ctx, is_inline, style, properties);
+        case "td":                      node = td(ctx, is_inline, style, properties);
+        case "tr":                      node = tr(ctx, is_inline, style, properties);
+        case "th":                      node = th(ctx, is_inline, style, properties);
+        case "title":                   node = title(ctx, is_inline, style, properties);
+        case "ul":                      node = ul(ctx, is_inline, style, properties);
+        case "video":                   node = video(ctx, is_inline, style, properties);
+        case:                           node = _create_node(ctx, tag = tag);
+    }
+
+    if is_inline {
+        error := end_node(ctx, node);
+        if error != NodeError.None {
+            return { error, utils.none(Node) };
+        }
+    }
+
+    return { NodeError.None, utils.some(node) };
 }
 
-end_node :: proc () {
-    panic("Not Implemented")
+end_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  ") -> types.NodeError {
+    using types;
+
+    error := _attach_node(ctx, node, indent = indent);
+    if error != NodeError.None {
+        fmt.printfln("[ERR]:{}|--- Error attaching node to tree: {}", indent, error);
+        return error;
+    }
+    // TODO: Add to rendering pipeline
+    // if node.is_renderable {
+    //   error := renderer._enqueue_node(ctx, node);
+    // }
+    return NodeError.None;
+}
+
+a :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+head :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+img :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+input :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+li :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+link :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+meta :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+nav :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+ol :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+p :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+// High Level API to create and link a JS script.
+script :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+span :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+table :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+td ::proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+
+}
+
+th ::proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+tr :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+
+}
+
+// High level API to create a h1-h9 node.
+title :: proc (
+    ctx:        ^types.Context,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+ul :: proc (
+    ctx: ^types.Context,
+    is_inline:  bool = false,
+    style: map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
+}
+
+video :: proc (
+    ctx: ^types.Context,
+    is_inline:  bool = false,
+    style: map[string]types.Option(string),
+    properties: map[string]types.Option(string)) -> types.Node {
+    panic("Unimplemented");
 }
 
 // High-level API to find a node within the context tree. Note, this function is O(n) and yggdrasil
@@ -77,12 +285,12 @@ find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> 
 // Low-level API to create a custom UI node, to be attached onto the tree later on. This is normally intended
 // to be abstracted away from the programmer behind high-level API entrypoints like 'begin_node'. One might
 // use this function to wait and prevent the automatic rendering mechanisms provided and performed by 'begin_node',
-// i.e. for a temporary node that does not live long enough to reach end of frame (Cleaned up with 'destroy_node(...)').
+// i.e. for a temporary node that does not live long enough to reach end of frame (Cleaned up with '_destroy_node(...)').
 //
 // Another common use-case would be to use this newly-created node from this function to only store and hold information
 // that might happen within a cycle, without expanding the tree unnecessarily (data-nodes).
 //
-// @lifetime:           This function does NOT cleanup after itself like the high-level API, hence 'destroy_node(..)'
+// @lifetime:           This function does NOT cleanup after itself, hence 'destroy_node(..)'
 //                      is needed for each corresponding 'create_node' in the frame's scope.
 // @param ctx:          The tree containing all nodes to be processed.
 // @param tag:          Which tag identifier will be used to lookup the node in the map. Tag needs to be unique, unless
@@ -98,8 +306,8 @@ _create_node :: proc (
     tag:        string,
     id:         types.Option(int)                   = nil,
     parent:     ^types.Node                         = nil,
-    style:      map[types.Id]types.Option(string)   = { },
-    properties: map[types.Id]types.Option(string)   = { },
+    style:      map[string]types.Option(string)   = { },
+    properties: map[string]types.Option(string)   = { },
     children:   map[types.Id]types.Node             = { },
     indent:     string                              = "  "
 ) -> types.Node {
@@ -144,7 +352,7 @@ _create_node :: proc (
 }
 
 // Deallocate a leaf and all of its children
-_destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.ContextError {
+_destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.NodeError {
     using types;
     using utils;
 
@@ -164,7 +372,7 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
         if level >= LogLevel.Normal {
             fmt.eprintfln("[ERR]:{}--- Error destroying node: Node [{}] not found", indent, id);
         }
-        return ContextError.NodeNotFound;
+        return NodeError.NodeNotFound;
     }
 
     if node_ptr.parent != nil {
@@ -195,7 +403,7 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
         fmt.printfln("[INFO]:{}--- Done", indent);
     }
 
-    return ContextError.None;
+    return NodeError.None;
 }
 
 // Low-level API to attach a node to the current ui tree. Benefit of this function over its high-level counterparts
@@ -206,7 +414,7 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
 //
 // @param ctx:    The current tree where we want to attach this node to. 
 // @param node:   Which node is to be added to the tree
-_attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  ") -> types.ContextError {
+_attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  ") -> types.NodeError {
     using types;
     using utils;
 
@@ -265,7 +473,7 @@ _attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = " 
         fmt.printfln("[INFO]:{}--- Done (%p)", indent, ctx.last_node);
     }
 
-    return ContextError.None
+    return NodeError.None
 }
 
 // Low-level API to detach a node in the current ui tree. Benefit of this function over its high-level counterparts

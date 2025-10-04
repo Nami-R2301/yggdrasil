@@ -1,4 +1,4 @@
-package yggdrasil;
+package ygg;
 
 import types "types";
 import utils "utils"

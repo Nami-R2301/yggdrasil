@@ -30,10 +30,6 @@ Context :: struct {
 ContextError :: enum u8 {
   None = 0,
   InvalidContext,
-  InvalidWindow,
   UinitializedContext,
-  DuplicateId,
-  NodeNotFound,
-  MaxIdReached,
   HeadlessMode,  // When the user tries to create or use a window when they are in headless mode.
 }

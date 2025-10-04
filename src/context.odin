@@ -1,4 +1,4 @@
-package yggdrasil;
+package ygg;
 
 import "vendor:glfw";
 import "core:fmt";
@@ -28,16 +28,20 @@ import utils "utils";
 // @return      An error if one occurred and if the context has been setup successfully.
 init_context :: proc (
     window_handle:   ^types.Window   = nil,
-    renderer_handle: ^types.Renderer = nil) -> (types.Error, types.Option(types.Context)) {
+    renderer_handle: ^types.Renderer = nil,
+    custom_config:   map[string]string = {}) -> types.Result(types.Context) {
     using types;
     using utils;
 
-    parse_error, parsed_config_opt := _sanitize_config();
-    if parse_error != ConfigError.None {
-        fmt.eprintfln("[ERR]:  --- Error creating context: {}", parse_error);
-        return parse_error, none(Context);
+    parsed_config := custom_config;
+    if len(custom_config) == 0 {
+        parse_error, parsed_config_opt := _sanitize_config();
+        if parse_error != ConfigError.None {
+            fmt.eprintfln("[ERR]:  --- Error creating context: {}", parse_error);
+            return { error = parse_error, opt = none(Context) };
+        }
+        parsed_config := unwrap(parsed_config_opt);
     }
-    parsed_config := unwrap(parsed_config_opt);
 
     level : LogLevel = into_debug(parsed_config["log_level"]);
 
@@ -49,12 +53,12 @@ init_context :: proc (
     }
 
     if new_window == nil && !into_bool(parsed_config["headless"]) {
-        window_error, window_opt := _create_window("Yggdrasil (Debug)");
-        if window_error != WindowError.None {
-            return window_error, none(Context);
+        result := _create_window("Yggdrasil (Debug)");
+        if result.error != WindowError.None || !is_some(result.opt) {
+            return { error = result.error, opt = none(Context) };
         }
 
-        new_window = new_clone(unwrap(window_opt));
+        new_window = new_clone(unwrap(result.opt));
     }
 
     if new_renderer == nil && into_bool(parsed_config["renderer"]) {
@@ -63,7 +67,7 @@ init_context :: proc (
         }
         renderer_error, renderer_opt := _create_renderer(type = RendererType.OpenGL, bg_color = 0x181818);
         if renderer_error != RendererError.None {
-            return RendererError.InitError, none(Context);
+            return { error = RendererError.InitError, opt = none(Context) };
         }
 
         new_renderer = new_clone(unwrap(renderer_opt));
@@ -117,7 +121,7 @@ _create_context :: proc (
     window_handle:      ^types.Window   = nil,
     renderer_handle:    ^types.Renderer = nil,
     config:             map[string]string,
-    indent:             string = "  ") -> (types.Error, types.Option(types.Context)) {
+    indent:             string = "  ") -> types.Result(types.Context) {
     using types;
     using utils;
 
@@ -145,7 +149,7 @@ _create_context :: proc (
         delete_string(str);
     }
 
-    return ContextError.None, some(ctx);
+    return { error = ContextError.None, opt = some(ctx) };
 }
 
 // Low-level API to completely reset the context tree, in the event you are conditionally resetting
@@ -194,7 +198,7 @@ _reset_context :: proc (ctx: ^types.Context, indent: string = "  ") {
 // @param   *ctx*:      The context in question.
 // @param   *indent*:   The depth of the indent for all logs within this function.
 // @return  If there were any errors destroying the context.
-_destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.ContextError {
+_destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.Error {
     using types;
     using utils;
 

@@ -3,15 +3,22 @@ package types;
 // Aggregate all errors into this type when a procedure might return multiple types of errors.
 Error :: union {
   ContextError,
+  NodeError,
   WindowError,
   RendererError,
   ConfigError,
 }
 
+
 // Rust-like optional type in odin.
 Option :: union ($T: typeid) {
   T,
   rawptr
+}
+
+Result :: struct ($T: typeid) {
+  error:  Error,
+  opt:    Option(T)
 }
 
 // File types supported for loading UI elements from common web formats.

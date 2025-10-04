@@ -5,6 +5,13 @@ Node :: struct {
   id:         Id,
   tag:        string,
   children:   map[Id]Node,
-  style:      map[Id]Option(string),
-  properties: map[Id]Option(string)
+  style:      map[string]Option(string),
+  properties: map[string]Option(string)
+}
+
+NodeError :: enum u8 {
+  None = 0,
+  DuplicateId,
+  NodeNotFound,
+  MaxIdReached
 }

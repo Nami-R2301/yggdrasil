@@ -1,4 +1,4 @@
-package yggdrasil;
+package ygg;
 
 import "core:fmt";
 import "core:strings";

@@ -5,8 +5,8 @@ import "vendor:glfw";
 import "core:fmt";
 
 import ygg "../src";
-import utils "yggdrasil:utils";
-import types "yggdrasil:types";
+import types "../src/types";
+import utils "../src/utils";
 
 main :: proc () {
   using types;
@@ -23,25 +23,26 @@ main :: proc () {
   temp_config["cache"]        = "";         // If we want to enable caching of nodes. Defaults to a truthy value.
   temp_config["renderer"]     = "";         // If we plan on rendering nodes. Defaults to a truthy value.
 
-  window_error, window_opt := ygg._create_window("Low Level Example");
-  assert(window_error == WindowError.None, "Error creating window");
-  window_handle := unwrap(window_opt);
+  result_window := ygg._create_window("Low Level Example");
+  assert(result_window.error == WindowError.None, "Error creating window");
+  window_handle := unwrap(result_window.opt);
 
 //  renderer_error, renderer_opt := ygg._create_renderer(bg_color = 0x222222);
 //  assert(renderer_error == RendererError.None, "Error creating renderer");
 //  renderer_handle := unwrap(renderer_opt);
 
-  error, ctx_opt := ygg._create_context(window_handle = &window_handle, config = temp_config);
-  assert(error == ContextError.None, "Error creating main context");
-  ctx := unwrap(ctx_opt);
+  result_ctx := ygg._create_context(window_handle = &window_handle, config = temp_config);
+  assert(into_bool(result_ctx), "Error creating main context");
+  ctx := unwrap(result_ctx.opt);
+  defer ygg._destroy_context(&ctx);
 
   head  := ygg._create_node(&ctx, tag = "head");
   link  := ygg._create_node(&ctx, tag = "link");
   link2 := ygg._create_node(&ctx, tag = "link", parent = &head);
 
-  error = ygg._attach_node(&ctx, head);
-  error = ygg._attach_node(&ctx, link);
-  error = ygg._attach_node(&ctx, link2);
+  error := ygg._attach_node(&ctx, head);
+  error =  ygg._attach_node(&ctx, link);
+  error =  ygg._attach_node(&ctx, link2);
 
   node := ygg.find_node(&ctx, 2);
   ygg.print_nodes(node);
@@ -53,7 +54,5 @@ main :: proc () {
       glfw.SwapBuffers(ctx.window.glfw_handle);
     }
   }
-
-  defer ygg._destroy_context(&ctx);
 }
 

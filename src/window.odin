@@ -1,4 +1,4 @@
-package yggdrasil;
+package ygg;
 
 import "core:fmt";
 import "core:strings";
@@ -30,13 +30,13 @@ _create_window :: proc (
     dimensions:     types.Option([2]u16) = nil,
     offset:         types.Option([2]u16) = nil,
     refresh_rate:   types.Option(u16) = nil,
-    indent:         string = "  ") -> (types.WindowError, types.Option(types.Window)) {
+    indent:         string = "  ") -> types.Result(types.Window) {
     using types;
     using utils;
 
     if !bool(glfw.Init()) {
         fmt.printfln("[ERR]:{}--- FATAL: Cannot initialize GLFW", indent);
-        return WindowError.InitError, none(types.Window);
+        return { error = WindowError.InitError, opt = none(types.Window) };
     }
     new_window : Window = { };
 
@@ -66,7 +66,7 @@ _create_window :: proc (
     new_window.offset = unwrap_or(offset, [2]u16{ 0, 0 });
     new_window.refresh_rate = refresh_rate;
 
-    return WindowError.None, new_window;
+    return { error = WindowError.None, opt = utils.some(new_window) };
 }
 
 // TODO: Graceful window shutdown process.

@@ -6,8 +6,8 @@ import "core:fmt";
 import "vendor:glfw";
 
 import ygg "../src";
-import "yggdrasil:types";
-import "yggdrasil:utils";
+import types "../src/types";
+import utils "../src/utils";
 
 config : map[string]string = {
   "test_mode" =  "true",
@@ -20,18 +20,18 @@ setup :: proc (t: ^testing.T) -> types.Context {
   using ygg;
   using utils;
 
-  error, ctx_opt := _create_context(config = config);
-  if error != ContextError.None {
-    fmt.eprintln("[ERR]:\t| Cannot create context: {}", error);
+  result := _create_context(config = config);
+  if result.error != ContextError.None {
+    fmt.eprintln("[ERR]:\t| Cannot create context: {}", result.error);
     testing.fail_now(t, "Cannot create context");
   }
   
-  ctx := unwrap(ctx_opt);
-  node := _create_node(&ctx, "root");
-  error = _attach_node(&ctx, node);
-  assert(error == ContextError.None, "Error attaching root node");
+  ctx := unwrap(result.opt);
+  node  := _create_node(&ctx, "root");
+  error := _attach_node(&ctx, node);
+  assert(error == NodeError.None, "Error attaching root node");
 
-  if error != ContextError.None {
+  if error != NodeError.None {
     fmt.eprintln("[ERR]:\t| Cannot create context: {}", error);
     testing.fail_now(t,"Cannot create context");
   }
@@ -62,7 +62,7 @@ create_duplicate :: proc (t: ^testing.T) {
   error := _attach_node(&ctx, first);
   error = _attach_node(&ctx, second);
 
-  testing.expect_value(t, error, ContextError.None);
+  testing.expect_value(t, error, NodeError.None);
 }
 
 @(test)
@@ -74,21 +74,21 @@ find_node :: proc (t: ^testing.T) {
   ctx := setup(t);
   defer cleanup(&ctx);
   
-  head  := _create_node(&ctx, "head");
-  link  := _create_node(&ctx, "link", parent = &head);
-  a     := _create_node(&ctx, "a", parent = &link);
+  head_node  := _create_node(&ctx, "head");
+  link_node  := _create_node(&ctx, "link", parent = &head_node);
+  a_node     := _create_node(&ctx, "a", parent = &link_node);
 
   node_ptr := find_node(&ctx, 2);
   testing.expect(t, node_ptr == nil, "A tag should not be found, since it is not attached to the tree");
 
-  error := _attach_node(&ctx, head);
-  testing.expect(t, error == ContextError.None, "Error attaching <head> node");
+  error := _attach_node(&ctx, head_node);
+  testing.expect(t, error == NodeError.None, "Error attaching <head> node");
   
-  error = _attach_node(&ctx, link);
-  testing.expect(t, error == ContextError.None, "Error attaching <link> node");
+  error = _attach_node(&ctx, link_node);
+  testing.expect(t, error == NodeError.None, "Error attaching <link> node");
   
-  error = _attach_node(&ctx, a);
-  testing.expect(t, error == ContextError.None, "Error attaching <a> node");
+  error = _attach_node(&ctx, a_node);
+  testing.expect(t, error == NodeError.None, "Error attaching <a> node");
 }
 
 @(test)
@@ -106,7 +106,7 @@ max_depth :: proc (t: ^testing.T) {
   for _ in 0..=lvl_1 - 1 {
     node  := _create_node(&ctx, "head");
     error := _attach_node(&ctx, node);
-    assert(error == ContextError.None, "Error attaching node");
+    assert(error == NodeError.None, "Error attaching node");
   }
 
   testing.expect_value(t, _get_node_depth(ctx.root), lvl_1);
@@ -117,7 +117,7 @@ max_depth :: proc (t: ^testing.T) {
   for _ in lvl_1..=lvl_2 - 1 {
     node  := _create_node(&ctx, "head");
     error := _attach_node(&ctx, node);
-    assert(error == ContextError.None, "Error attaching node");
+    assert(error == NodeError.None, "Error attaching node");
   }
 
 
@@ -129,7 +129,7 @@ max_depth :: proc (t: ^testing.T) {
   for _ in lvl_2..=lvl_3 - 1 {
     node  := _create_node(&ctx, "head");
     error := _attach_node(&ctx, node);
-    assert(error == ContextError.None, "Error attaching node");
+    assert(error == NodeError.None, "Error attaching node");
   }
 
   testing.expect_value(t, _get_node_depth(ctx.root), lvl_3);
@@ -172,32 +172,23 @@ simple :: proc (t: ^testing.T) {
   temp_config["cache"]        = "";
   temp_config["renderer"]     = "";
 
-  window_error, window_opt := ygg._create_window("Simple");
-  assert(window_error == WindowError.None, "Error creating window");
-  window_handle := unwrap(window_opt);
+  result_window := ygg._create_window("Simple");
+  assert(result_window.error == WindowError.None, "Error creating window");
+  window_handle := unwrap(result_window.opt);
 
-  error, ctx_opt := ygg._create_context(window_handle = &window_handle, config = temp_config);
-  assert(error == ContextError.None, "Error creating main context");
-  ctx := unwrap(ctx_opt);
+  result_ctx := ygg._create_context(window_handle = &window_handle, config = temp_config);
+  assert(result_ctx.error == ContextError.None, "Error creating main context");
+  ctx := unwrap(result_ctx.opt);
+  defer ygg._destroy_context(&ctx);
 
   head  := ygg._create_node(&ctx, tag = "head");
   link  := ygg._create_node(&ctx, tag = "link");
   link2 := ygg._create_node(&ctx, tag = "link", parent = &head);
 
-  error = ygg._attach_node(&ctx, head);
-  error = ygg._attach_node(&ctx, link);
-  error = ygg._attach_node(&ctx, link2);
+  error := ygg._attach_node(&ctx, head);
+  error =  ygg._attach_node(&ctx, link);
+  error =  ygg._attach_node(&ctx, link2);
 
   node := ygg.find_node(&ctx, 2);
   ygg.print_nodes(node);
-
-  headless_mode: bool = into_bool(ctx.config["headless"]);
-  if !headless_mode {
-    for bool(!glfw.WindowShouldClose(ctx.window.glfw_handle)) {
-      glfw.PollEvents();
-      glfw.SwapBuffers(ctx.window.glfw_handle);
-    }
-  }
-
-  defer ygg._destroy_context(&ctx);
 }
