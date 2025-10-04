@@ -22,39 +22,39 @@ begin_node :: proc (
 
     assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
 
-    node: Node;
+    result: Result(Node) = { error = NodeError.None, opt = utils.none(Node) };
     switch tag {
-        case "html", "root", "main":    node = _create_node(ctx, tag = tag, id = 0);
-        case "a":                       node = a(ctx, is_inline, style, properties);
-        case "head":                    node = head(ctx, is_inline, style, properties);
-        case "img", "Image":            node = img(ctx, is_inline, style, properties);
-        case "input":                   node = input(ctx, is_inline, style, properties);
-        case "li":                      node = li(ctx, is_inline, style, properties);
-        case "link":                    node = link(ctx, is_inline, style, properties);
-        case "meta":                    node = meta(ctx, is_inline, style, properties);
-        case "nav":                     node = nav(ctx, is_inline, style, properties);
-        case "ol":                      node = ol(ctx, is_inline, style, properties);
-        case "p":                       node = p(ctx, is_inline, style, properties);
-        case "script":                  node = script(ctx, is_inline, style, properties);
-        case "span":                    node = span(ctx, is_inline, style, properties);
-        case "table":                   node = table(ctx, is_inline, style, properties);
-        case "td":                      node = td(ctx, is_inline, style, properties);
-        case "tr":                      node = tr(ctx, is_inline, style, properties);
-        case "th":                      node = th(ctx, is_inline, style, properties);
-        case "title":                   node = title(ctx, is_inline, style, properties);
-        case "ul":                      node = ul(ctx, is_inline, style, properties);
-        case "video":                   node = video(ctx, is_inline, style, properties);
-        case:                           node = _create_node(ctx, tag = tag);
+        case "html", "root", "main":    result.opt = utils.some(_create_node(ctx, tag = tag, id = 0));
+        case "a":                       result = a(ctx, is_inline, style, properties);
+        case "head":                    result = head(ctx, is_inline, style, properties);
+        case "img", "Image":            result = img(ctx, is_inline, style, properties);
+        case "input":                   result = input(ctx, is_inline, style, properties);
+        case "li":                      result = li(ctx, is_inline, style, properties);
+        case "link":                    result = link(ctx, is_inline, style, properties);
+        case "meta":                    result = meta(ctx, is_inline, style, properties);
+        case "nav":                     result = nav(ctx, is_inline, style, properties);
+        case "ol":                      result = ol(ctx, is_inline, style, properties);
+        case "p":                       result = p(ctx, is_inline, style, properties);
+        case "script":                  result = script(ctx, is_inline, style, properties);
+        case "span":                    result = span(ctx, is_inline, style, properties);
+        case "table":                   result = table(ctx, is_inline, style, properties);
+        case "td":                      result = td(ctx, is_inline, style, properties);
+        case "tr":                      result = tr(ctx, is_inline, style, properties);
+        case "th":                      result = th(ctx, is_inline, style, properties);
+        case "title":                   result = title(ctx, is_inline, style, properties);
+        case "ul":                      result = ul(ctx, is_inline, style, properties);
+        case "video":                   result = video(ctx, is_inline, style, properties);
+        case:                           result.opt = utils.some(_create_node(ctx, tag = tag));
     }
 
-    if is_inline {
-        error := end_node(ctx, node);
+    if result.error == NodeError.None && is_inline {
+        error := end_node(ctx, utils.unwrap(result.opt));
         if error != NodeError.None {
             return { error, utils.none(Node) };
         }
     }
 
-    return { NodeError.None, utils.some(node) };
+    return result;
 }
 
 end_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  ") -> types.NodeError {
@@ -75,80 +75,80 @@ end_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  ") 
 a :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 head :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 img :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 input :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 li :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 link :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 meta :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 nav :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 ol :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 p :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
@@ -156,32 +156,32 @@ p :: proc (
 script :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 span :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 table :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 td ::proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 
 }
@@ -189,16 +189,16 @@ td ::proc (
 th ::proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 tr :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 
 }
@@ -207,24 +207,24 @@ tr :: proc (
 title :: proc (
     ctx:        ^types.Context,
     is_inline:  bool = false,
-    style:      map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 ul :: proc (
-    ctx: ^types.Context,
+    ctx:        ^types.Context,
     is_inline:  bool = false,
-    style: map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
 video :: proc (
-    ctx: ^types.Context,
+    ctx:        ^types.Context,
     is_inline:  bool = false,
-    style: map[string]types.Option(string),
-    properties: map[string]types.Option(string)) -> types.Node {
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
     panic("Unimplemented");
 }
 
