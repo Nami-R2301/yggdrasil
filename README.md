@@ -49,7 +49,7 @@ main :: proc () {
 
 ## Examples:
 
-- Go to the specific example you want to build & run and uncomment the main procedure - let's take the first one (01_immediate.odin):
+- Go to the specific example you want to build & run and uncomment the main procedure, then run:
 
 ```bash
 odin run -collection:yggdrasil=./src ./examples -file
