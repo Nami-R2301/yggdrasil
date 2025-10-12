@@ -52,5 +52,5 @@ main :: proc () {
 - Go to the specific example you want to build & run and uncomment the main procedure, then run:
 
 ```bash
-make example
+make example && ./bin/<example_uncommented.odin>
 ```
