@@ -1,4 +1,4 @@
-# Yggdrasil - HTML-like UI to Ease Rendering of UI Elements
+# Yggdrasil - HTML-like GUI
 
 Yggdrasil is an Odin library to facilitate writing UI with tree nodes, inspired by the HTML doctype. You can also use this library for a headless setup, where you can record and store data nodes instead of renderable nodes to pass on to another program for instance.
 
@@ -40,8 +40,7 @@ main :: proc () {
         {
             ygg.head(&ctx);
             {
-                ygg.link(&ctx, is_inline = true);
-                ygg.link(&ctx, is_inline = true);
+                ygg.title(&ctx, "Hello World!", center = true, is_inline = true);
             }
             ygg.end_node(&ctx, "head");
         }
@@ -57,5 +56,5 @@ main :: proc () {
 - Go to the specific example you want to build & run and uncomment the main procedure - let's take the first one (01_immediate.odin):
 
 ```bash
-odin run -collection:yggdrasil=./src -file 01_immediate.odin
+odin run -collection:yggdrasil=./src ./examples -file
 ```
