@@ -20,9 +20,9 @@ make
 
 ## Hello World
 ```odin
-import ygg "../src";
-import types "../src/types";
-import utils "../src/utils";
+import ygg "./src";
+import types "./src/types";
+import utils "./src/utils";
 
 main :: proc () {
     using types;
