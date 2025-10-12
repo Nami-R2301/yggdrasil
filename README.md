@@ -27,7 +27,6 @@ main :: proc () {
     using utils;
 
     result := ygg.init_context();
-    assert(into_bool(result), "Error initializing context");
     ctx := unwrap(result.opt);
     defer ygg.terminate_context(&ctx);
 
