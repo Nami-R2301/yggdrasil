@@ -21,8 +21,8 @@ make
 ## Hello World
 ```odin
 import ygg "./src";
-import types "./src/types";
-import utils "./src/utils";
+import types "ygg:types";
+import utils "ygg:utils";
 
 main :: proc () {
     using types;
