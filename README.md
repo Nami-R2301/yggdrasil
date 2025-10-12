@@ -38,11 +38,7 @@ main :: proc () {
 
         ygg.root(&ctx);
         {
-            ygg.head(&ctx);
-            {
-                ygg.title(&ctx, "Hello World!", center = true, is_inline = true);
-            }
-            ygg.end_node(&ctx, "head");
+            ygg.title(&ctx, "Hello World!", center = true, is_inline = true);
         }
         ygg.end_node(&ctx, "root");
 
