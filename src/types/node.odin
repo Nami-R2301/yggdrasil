@@ -13,5 +13,6 @@ NodeError :: enum u8 {
   None = 0,
   DuplicateId,
   NodeNotFound,
-  MaxIdReached
+  MaxIdReached,
+  InvalidNode
 }

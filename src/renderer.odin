@@ -1,6 +1,7 @@
 package ygg;
 
 import "types";
+import "core:container/queue";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,5 +16,6 @@ _create_renderer :: proc (type: types.RendererType = types.RendererType.OpenGL, 
 
 // TODO: Deallocate and free up buffers in the pipeline for graceful shutdown.
 _destroy_renderer :: proc (renderer: ^types.Renderer) -> types.RendererError {
+    queue.destroy(&renderer.node_queue);
     panic("Unimplemented");
 }

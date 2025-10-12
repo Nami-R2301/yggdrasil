@@ -1,5 +1,7 @@
 package types;
 
+import "core:container/queue";
+
 // NOTE: The u16 encoding limit for IDs is a deliberate choice, since I deemed this library far too unoptimized to 
 // even fathom having more that 2^16 nodes in a tree at a time. Main bottlenecks here are searching and dispatching
 // custom event handling on a per-node basis. So in theory, if anyone wants to extend this library and can address
@@ -20,6 +22,7 @@ Context :: struct {
   last_node:                ^Node,
   cursor:                   Dimension,
   renderer:                 ^Renderer,
+  node_pairs:               queue.Queue(Node),
   config:                   map[string]string,
   mouseEventHandlers:       map[Id]MouseEvent, 
   keyboardEventHandlers:    map[Id]KeyboardEvent,

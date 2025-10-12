@@ -2,6 +2,7 @@ package ygg;
 
 import "core:fmt";
 import "core:strings";
+import "core:container/queue";
 
 import types "types";
 import utils "utils";
@@ -17,38 +18,37 @@ begin_node :: proc (
     tag:        string,
     is_inline:  bool = false,
     style:      map[string]types.Option(string) = {},
-    properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    properties: map[string]types.Option(string) = {},
+    indent: string = "  ") -> types.Result(types.Node) {
     using types;
 
     assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
 
     result: Result(Node) = { error = NodeError.None, opt = utils.none(Node) };
-    switch tag {
-        case "html", "root", "main":    result.opt = utils.some(_create_node(ctx, tag = tag, id = 0));
-        case "a":                       result = a(ctx, is_inline, style, properties);
-        case "head":                    result = head(ctx, is_inline, style, properties);
-        case "img", "Image":            result = img(ctx, is_inline, style, properties);
-        case "input":                   result = input(ctx, is_inline, style, properties);
-        case "li":                      result = li(ctx, is_inline, style, properties);
-        case "link":                    result = link(ctx, is_inline, style, properties);
-        case "meta":                    result = meta(ctx, is_inline, style, properties);
-        case "nav":                     result = nav(ctx, is_inline, style, properties);
-        case "ol":                      result = ol(ctx, is_inline, style, properties);
-        case "p":                       result = p(ctx, is_inline, style, properties);
-        case "script":                  result = script(ctx, is_inline, style, properties);
-        case "span":                    result = span(ctx, is_inline, style, properties);
-        case "table":                   result = table(ctx, is_inline, style, properties);
-        case "td":                      result = td(ctx, is_inline, style, properties);
-        case "tr":                      result = tr(ctx, is_inline, style, properties);
-        case "th":                      result = th(ctx, is_inline, style, properties);
-        case "title":                   result = title(ctx, is_inline, style, properties);
-        case "ul":                      result = ul(ctx, is_inline, style, properties);
-        case "video":                   result = video(ctx, is_inline, style, properties);
-        case:                           result.opt = utils.some(_create_node(ctx, tag = tag));
+    result.opt = utils.some(_create_node(ctx, tag = tag, style = style, properties = properties));
+
+    if result.error != NodeError.None {
+        return result;
     }
 
-    if result.error == NodeError.None && is_inline {
-        error := end_node(ctx, utils.unwrap(result.opt));
+    node := utils.unwrap(result.opt);
+
+    if queue.len(ctx.node_pairs) > 0 {
+        node.parent = queue.peek_back(&ctx.node_pairs);
+    }
+
+    new_indent := strings.concatenate({indent, "  "});
+    error := _attach_node(ctx, node, indent);
+    delete_string(new_indent);
+
+    if error != NodeError.None {
+        fmt.printfln("[ERR]:{}--- Error beginning node '{}': Cannot attach node -> {}", indent, tag, error);
+        return { error, utils.none(Node) };
+    }
+
+    queue.push(&ctx.node_pairs, node);
+    if is_inline {
+        error := end_node(ctx, node.tag);
         if error != NodeError.None {
             return { error, utils.none(Node) };
         }
@@ -57,19 +57,32 @@ begin_node :: proc (
     return result;
 }
 
-end_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  ") -> types.NodeError {
+end_node :: proc (ctx: ^types.Context, tag: string, indent: string = "  ") -> types.NodeError {
     using types;
 
-    error := _attach_node(ctx, node, indent = indent);
-    if error != NodeError.None {
-        fmt.printfln("[ERR]:{}|--- Error attaching node to tree: {}", indent, error);
-        return error;
+    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
+    new_indent, _ := strings.concatenate({ indent, "  " });
+    node_ptr := find_node(ctx, tag, indent = new_indent);
+    delete_string(new_indent);
+
+    if node_ptr == nil {
+        fmt.printfln("[ERR]:{}| Error ending node: Node given is 'None' ({})", indent, #location())
+        return NodeError.InvalidNode;
     }
-    // TODO: Add to rendering pipeline
-    // if node.is_renderable {
-    //   error := renderer._enqueue_node(ctx, node);
-    // }
+
+    // Add to rendering queue and pop from queue list at the same time.
+    queue.pop_back(&ctx.node_pairs);
     return NodeError.None;
+}
+
+root :: proc (
+    ctx:        ^types.Context,
+    style:      map[string]types.Option(string) = {},
+    properties: map[string]types.Option(string) = {}
+) -> types.Result(types.Node) {
+    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
+
+    return begin_node(ctx, "root", false, style, properties);
 }
 
 a :: proc (
@@ -85,7 +98,9 @@ head :: proc (
     is_inline:  bool = false,
     style:      map[string]types.Option(string) = {},
     properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    panic("Unimplemented");
+    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
+
+    return begin_node(ctx, "head", is_inline, style, properties);
 }
 
 img :: proc (
@@ -117,7 +132,9 @@ link :: proc (
     is_inline:  bool = false,
     style:      map[string]types.Option(string) = {},
     properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    panic("Unimplemented");
+    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
+
+    return begin_node(ctx, "link", is_inline, style, properties);
 }
 
 meta :: proc (
@@ -228,6 +245,11 @@ video :: proc (
     panic("Unimplemented");
 }
 
+find_node :: proc {
+    find_node_with_id,
+    find_node_with_tag
+}
+
 // High-level API to find a node within the context tree. Note, this function is O(n) and yggdrasil
 // does not support caching yet. Therefore, it is recommended that you save or cache your common
 // queries to avoid impacting performance for large-scale applications.
@@ -236,7 +258,7 @@ video :: proc (
 // @param   id:     The node ID you are looking for.
 // @param   indent: The level of indent for all logs inside this function, open for fine-tuning.
 // @return  Nil if the node was not found, the pointer to the node within the tree otherwise.
-find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> ^types.Node {
+find_node_with_id :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> ^types.Node {
     assert(ctx != nil, "[ERR]:\t| Error finding node: Context is nil!");
 
     log_level := utils.into_debug(ctx.config["log_level"]);
@@ -260,9 +282,49 @@ find_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> 
         return ctx.root;
     }
 
-    node_ptr := _flatten_and_find_node(ctx.root, find = id);
+    node_ptr := _flatten_and_find_node(ctx.root, id = id);
 
     if node_ptr != nil && node_ptr.id == id {
+        if log_level >= types.LogLevel.Verbose {
+            fmt.println(" Done");
+        }
+        return node_ptr;
+    }
+
+    if log_level >= types.LogLevel.Verbose {
+        fmt.printfln("\n[WARN]:{}--- Node not found", indent);
+    }
+
+    return nil;
+}
+
+find_node_with_tag :: proc (ctx: ^types.Context, tag: string, indent: string = "  ") -> ^types.Node {
+    assert(ctx != nil, "[ERR]:\t| Error finding node: Context is nil!");
+
+    log_level := utils.into_debug(ctx.config["log_level"]);
+
+    if log_level >= types.LogLevel.Verbose {
+        fmt.printf("[INFO]:{}| Searching for node id '{}' in context tree ...", indent, tag);
+    }
+
+    if ctx.root == nil {
+        if log_level >= types.LogLevel.Verbose {
+            fmt.println(" Done");
+        }
+        return ctx.root;
+    }
+
+    if tag == ctx.root.tag {
+        if log_level >= types.LogLevel.Verbose {
+            fmt.println(" Done");
+        }
+
+        return ctx.root;
+    }
+
+    node_ptr := _flatten_and_find_node(ctx.root, tag = tag);
+
+    if node_ptr != nil && node_ptr.tag == tag {
         if log_level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
@@ -396,7 +458,9 @@ _destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ")
     }
 
     for node_to_delete in nodes_to_delete_ordered {
-        delete_map(node_to_delete.children);
+        if len(node_to_delete.children) != 0 {
+            delete_map(node_to_delete.children);
+        }
     }
 
     if level >= LogLevel.Verbose {
@@ -585,12 +649,17 @@ _flatten_node :: proc (start_ptr: ^types.Node, stop_at: types.Option(types.Id) =
     return flat_nodes;
 }
 
+_flatten_and_find_node :: proc {
+    _flatten_and_find_node_with_id,
+    _flatten_and_find_node_with_tag
+}
+
 // Helper to flatten all map nodes into a single dynamic sorted array, and use that to find the node id provided.
 //
 // @param   *start_ptr*:    Which node to flatten.
 // @param   *find*:         ID to find when flattening nodes and once found, stop the flattening process.
 // @return  The node to find (nil if not found).
-_flatten_and_find_node :: proc (start_ptr: ^types.Node, find: types.Id) -> ^types.Node {
+_flatten_and_find_node_with_id :: proc (start_ptr: ^types.Node, id: types.Id) -> ^types.Node {
     using types;
 
     // Stack for DFS traversal, implemented with a dynamic array.
@@ -607,7 +676,41 @@ _flatten_and_find_node :: proc (start_ptr: ^types.Node, find: types.Id) -> ^type
     for len(to_visit) > 0 {
         node := pop(&to_visit);
         append(&flat_nodes, node);
-        if find == node.id {
+        if id == node.id {
+            return node;
+        }
+
+        for _, &child in node.children {
+            append(&to_visit, &child);
+        }
+    }
+
+    return nil;
+}
+
+// Helper to flatten all map nodes into a single dynamic sorted array, and use that to find the first node tag provided.
+//
+// @param   *start_ptr*:    Which node to flatten.
+// @param   *find*:         Tag to find when flattening nodes and once found, stop the flattening process.
+// @return  The node to find (nil if not found).
+_flatten_and_find_node_with_tag :: proc (start_ptr: ^types.Node, tag: string) -> ^types.Node {
+    using types;
+
+    // Stack for DFS traversal, implemented with a dynamic array.
+    to_visit := make([dynamic]^Node);
+    defer delete(to_visit);
+
+    // Flatten map to store the nodes in post-order (children first).
+    flat_nodes := make([dynamic]^Node);
+    defer delete_dynamic_array(flat_nodes);
+
+    append(&to_visit, start_ptr);
+
+    // Dynamically grow the flat list of nodes, and only stop when all inner nodes have been explored.
+    for len(to_visit) > 0 {
+        node := pop(&to_visit);
+        append(&flat_nodes, node);
+        if tag == node.tag {
             return node;
         }
 

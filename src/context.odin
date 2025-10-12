@@ -3,6 +3,7 @@ package ygg;
 import "vendor:glfw";
 import "core:fmt";
 import "core:strings";
+import "core:container/queue";
 
 import types "types";
 import utils "utils";
@@ -72,7 +73,7 @@ init_context :: proc (
 
         new_renderer = new_clone(unwrap(renderer_opt));
     }
-    return _create_context(window_handle, renderer_handle, config = parsed_config);
+    return _create_context(new_window, new_renderer, config = parsed_config);
 }
 
 // High-level API to delete and free up context provided. This is necessary to call to free up resources
@@ -86,7 +87,6 @@ init_context :: proc (
 // @return  An error if one occurred.
 terminate_context :: proc (ctx: ^types.Context) -> types.Error {
     error := _destroy_context(ctx);
-    delete_map(ctx.config);
 
     if ctx.window != nil {
         free(ctx.window);
@@ -203,6 +203,10 @@ _destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.E
     using utils;
 
     assert(ctx != nil, "[ERR]:\t| Error resetting context: Context is nil!");
+
+    if len(ctx.config) > 0 {
+        delete_map(ctx.config);
+    }
 
     level : LogLevel = into_debug(ctx.config["log_level"]);
 

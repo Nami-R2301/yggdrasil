@@ -1,11 +1,14 @@
 package types;
 
+import "core:container/queue";
+
 Renderer :: struct {
-  vbos: []u8,
-  vaos: []u8,
-  ibos: []u8,
-  framebuffers: []u8,
-  textures: []u8
+  node_queue:   queue.Queue(Node),
+  vbos:         [dynamic]u8,
+  vaos:         [dynamic]u8,
+  ibos:         [dynamic]u8,
+  framebuffers: [dynamic]u8,
+  textures:     [dynamic]u8
 }
 
 RendererError :: enum u8 {
