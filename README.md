@@ -38,7 +38,11 @@ main :: proc () {
 
         ygg.root(&ctx);
         {
-            ygg.title(&ctx, "Hello World!", center = true, is_inline = true);
+            _, node_ptr := ygg.title(&ctx, "Hello World!", is_inline = true);
+            node_ptr.style["position"]  = "absolute";
+            node_ptr.style["width"]     = "100%";
+            node_ptr.style["height"]    = "100%";
+            node_ptr.style["font-size"] = "24px";
         }
         ygg.end_node(&ctx, "root");
 
