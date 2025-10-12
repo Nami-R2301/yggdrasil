@@ -21,11 +21,9 @@ make
 ## Hello World
 ```odin
 import ygg "./src";
-import types "ygg:types";
 import utils "ygg:utils";
 
 main :: proc () {
-    using types;
     using utils;
 
     result := ygg.init_context();
