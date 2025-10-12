@@ -10,7 +10,7 @@ test: dev
 	odin test tests -collection:ygg=./src
 
 example:
-	odin run examples -collection:ygg=./src -file
+	odin build examples -collection:ygg=./src -file
 
 .PHONY: clean
 clean:
