@@ -1,14 +1,16 @@
 all: test
-	odin run examples/02_low_lvl_api.odin -collection:ygg=./src -file
 
-dev: examples/02_low_lvl_api.odin
-	odin build examples/02_low_lvl_api.odin -collection:ygg=./src -file -out:bin/02_low_lvl_api
+dev: src
+	odin build -collection:ygg=./src -file -out:bin/yggdrasil
 
-release: examples/02_low_lvl_api.odin
-	odin build examples/02_low_lvl_api.odin -collection:ygg=./src -file -o:speed -out:bin/02_low_lvl_api
+release: src
+	odin build -collection:ygg=./src -file -o:speed -out:bin/yggdrasil
 
 test: dev
 	odin test tests -collection:ygg=./src
+
+example:
+	odin build examples -collection:ygg=./src -file
 
 .PHONY: clean
 clean:
