@@ -10,7 +10,7 @@ import rt    "../src/retained";
 import types "../src/types";
 import utils "../src/utils";
 
-main :: proc () {
+retained :: proc () {
     using types;
     using utils;
 
@@ -23,9 +23,11 @@ main :: proc () {
     // Unlike the immediate mode example, in the retained mode API you MUST provide the window & renderer handles to
     // 'create_context()' IF you plan on endering your nodes onto a surface.
     ctx_result := rt.create_context(window_handle = &window_handle, renderer_handle = &renderer_handle, config = {
-        "log_level" = "vvv"
+        "log_level" = "",
+        "headless"  = "true"
     });
     ctx := unwrap(ctx_result.opt);
+    defer rt.destroy_context(&ctx);
 
     head  := rt.create_node(&ctx, tag = "head");
     title := rt.create_node(&ctx, tag = "title", parent = &head);
