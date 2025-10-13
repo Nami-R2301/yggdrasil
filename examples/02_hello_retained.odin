@@ -22,25 +22,25 @@ main :: proc () {
 
     // Unlike the immediate mode example, in the retained mode API you MUST provide the window & renderer handles to
     // 'create_context()' IF you plan on endering your nodes onto a surface.
-    result_ctx := rt.create_context(window_handle = &window_handle, renderer_handle = &renderer_handle, config = {
+    ctx_result := rt.create_context(window_handle = &window_handle, renderer_handle = &renderer_handle, config = {
         "log_level" = "vvv"
     });
-    ctx := unwrap(result_ctx.opt);
+    ctx := unwrap(ctx_result.opt);
 
     head  := rt.create_node(&ctx, tag = "head");
     title := rt.create_node(&ctx, tag = "title", parent = &head);
 
-    error := rt.attach_node(&ctx, head);
-    error  = rt.attach_node(&ctx, title);
+    node_error := rt.attach_node(&ctx, head);
+    node_error  = rt.attach_node(&ctx, title);
 
-    result := rt.create_buffer(&renderer_handle, BufferType.vbo);
-    buffer := unwrap(result.opt);
+    buffer_result := rt.create_buffer(BufferType.vbo);
+    buffer := unwrap(buffer_result.opt);
 
     // Serialize the node styles into recognizable draw properties and compile the vertices into compact bytes.
-    result_serde  := rt.serialize_nodes(&renderer_handle, { head, title });
+    serde_result  := rt.serialize_nodes({ head, title });
 
     // Set the buffer to its respective type, bind it, and optionally init with given data.
-    buffer_error  := rt.prepare_buffer(&renderer_handle, &buffer, data = unwrap(result_serde.opt));
+    buffer_error  := rt.prepare_buffer(&buffer, data = unwrap(serde_result.opt));
 
     // IMPORTANT: Add the newly created buffer into the main rendering pipeline.
     rt.attach_buffer(&renderer_handle, &buffer);

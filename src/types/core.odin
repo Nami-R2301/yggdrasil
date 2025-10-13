@@ -7,6 +7,7 @@ Error :: union {
   WindowError,
   RendererError,
   ConfigError,
+  BufferError
 }
 
 

@@ -1,20 +1,20 @@
 package ygg;
 
-import "core:fmt";
-import "core:strings";
-import "vendor:glfw";
+import fmt "core:fmt";
+import strings "core:strings";
+import glfw "vendor:glfw";
 
 import types "types";
 import utils "utils";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////// LOW LEVEL API //////////////////////////////////////////////
+//////////////////////////////////////////////////// CORE //////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-// Low-level API to create a window context with either OpenGL or Vulkan as the GPU API.
+// Core API to create a window context with either OpenGL or Vulkan as the GPU API.
 //
 // @param   *title*:          The window's title.
 // @param   *profile*:        Whether to optimize OpenGL's context or not. Defaults to debug mode.
@@ -23,7 +23,7 @@ import utils "utils";
 // @param   *offset*:         Where on the screen should the window pop up.
 // @param   *refresh_rate*:   How many frames the context should output, utils.none() will default to vsync.
 // @return  If an error occurred or not and the window if it has been created without errors.
-_create_window :: proc (
+create_window :: proc (
     title:          string,
     profile:        string = "debug",
     target:         types.RendererType = types.RendererType.OpenGL,
@@ -49,7 +49,7 @@ _create_window :: proc (
         glfw.WindowHint(glfw.CLIENT_API, glfw.OPENGL_API);
         glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE);
     } else {
-    // Vulkan
+        // Vulkan
         glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API);
     }
     glfw.WindowHint(glfw.VERSION_MAJOR, 3);
@@ -70,6 +70,6 @@ _create_window :: proc (
 }
 
 // TODO: Graceful window shutdown process.
-_destroy_window :: proc (window_handle: ^types.Window, indent: string = "  ") -> types.WindowError {
+destroy_window :: proc (window_handle: ^types.Window, indent: string = "  ") -> types.WindowError {
     panic("Unimplemented");
 }

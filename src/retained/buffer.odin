@@ -1,6 +1,5 @@
 package retained;
 
-import queue "core:container/queue";
 import strings "core:strings";
 import gl "vendor:OpenGL";
 import fmt "core:fmt";
@@ -16,15 +15,12 @@ C_VBO_SIZE_LIMIT: u64 = 10_000_000;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-_create_buffer :: proc (
-renderer_ptr:   ^types.Renderer,
-buffer_type:    types.BufferType,
-capacity:       u64 = 1_000_000,
-indent:         string = "  ") -> types.Result(types.Buffer) {
+create_buffer :: proc (
+    buffer_type:    types.BufferType,
+    capacity:       u64 = 1_000_000,
+    indent:         string = "  ") -> types.Result(types.Buffer) {
     using types;
     using utils;
-
-    assert(renderer_ptr != nil, "Error when creating buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
 
     buffer := types.Buffer {
         id = 0,
@@ -37,7 +33,7 @@ indent:         string = "  ") -> types.Result(types.Buffer) {
     fmt.printfln("[INFO]:{}| Creating buffer of type '{}' and capacity of '{}' ...", indent, buffer_type, capacity);
 
     inner_indent := strings.concatenate({indent, "  "});
-    error := _validate_buffer_params(buffer, inner_indent);
+    error := validate_buffer_params(buffer, inner_indent);
     delete_string(inner_indent);
 
     if error != BufferError.None {
@@ -50,17 +46,17 @@ indent:         string = "  ") -> types.Result(types.Buffer) {
     return { error = BufferError.None, opt = some(buffer) };
 }
 
-_destroy_buffer :: proc (
-renderer_ptr:   ^types.Renderer,
-buffer_type:    types.BufferType,
-id:             u32,
-indent:         string = "  ") -> types.BufferError {
+destroy_buffer :: proc (
+    renderer_ptr:   ^types.Renderer,
+    buffer_type:    types.BufferType,
+    id:             u32,
+    indent:         string = "  ") -> types.BufferError {
     using types;
 
     assert(renderer_ptr != nil, "Error when destroying buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
     fmt.printfln("[INFO]:{}| Destroying buffer of type '{}' ('') ...", indent, buffer_type, id);
 
-    id_ptr := _find_buffer(renderer_ptr, buffer_type, id);
+    id_ptr := find_buffer(renderer_ptr, buffer_type, id);
     if id_ptr == nil {
         return BufferError.BufferNotFound;
     }
@@ -71,45 +67,57 @@ indent:         string = "  ") -> types.BufferError {
     return BufferError.None;
 }
 
-_render_now :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
-    assert(renderer_ptr != nil, "Error when rendering: No renderer setup at the moment of drawing! Did you forget to first call '_create_renderer()'?");
-
-    gl.DrawArrays(gl.TRIANGLES, 0, i32(_get_buffer_len(renderer_ptr, types.BufferType.vbo)));
-}
-
-_prepare_buffer :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
-    assert(renderer_ptr != nil, "Error when creating buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
+// TODO: Clear out buffer data, but keep capacity intact in case the space is reused later.
+reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") {
     panic("Unimplemented");
 }
 
+// TODO: Load shader program, init 2D settings, draw all vertices, and revert 2D settings in case renderer is used elsewhere.
+render_now :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
+    assert(renderer_ptr != nil, "Error when rendering: No renderer setup! Did you forget to first call '_create_renderer()'?");
 
-_append_buffer :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
-    assert(renderer_ptr != nil, "Error when creating buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
+    gl.DrawArrays(gl.TRIANGLES, 0, i32(renderer_ptr.vbo.count));
+}
+
+// TODO: Bind buffer for static drawing into VRAM in its appropriate location with data passed optionally to init.
+prepare_buffer :: proc (
+    buffer:         ^types.Buffer,
+    data:           []byte = {},
+    indent:         string = "  ") -> types.BufferError {
     panic("Unimplemented");
 }
 
-_shrink_buffer :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
-    assert(renderer_ptr != nil, "Error when creating buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
+// TODO: Put buffer in draw pipeline to render later, depending on the type.
+attach_buffer :: proc (renderer_ptr: ^types.Renderer, buffer: ^types.Buffer, indent: string = "  ") {
+    assert(renderer_ptr != nil, "Error when attaching buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
     panic("Unimplemented");
 }
 
-_migrate_buffer :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
-    assert(renderer_ptr != nil, "Error when creating buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
+// TODO: Pack node styling and properties into appropriate uniforms and vertex data to pass to shader later on.
+serialize_nodes :: proc (node: []types.Node, indent: string = "  ") -> types.Result([]byte) {
     panic("Unimplemented");
 }
 
-_reset_buffer :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
-    assert(renderer_ptr != nil, "Error when creating buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
+// TODO: Dynamically grow buffer in the event the data is dynamic. Might have to redo the buffer with DYNAMIC_DRAW?
+grow_buffer :: proc (
+    buffer:         ^types.Buffer,
+    data:           []byte,
+    indent:         string = "  ") -> types.BufferError {
     panic("Unimplemented");
 }
 
-_get_buffer_len :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferType) -> u64 {
-    buffer_ptr := _match_buffer(renderer_ptr, buffer_type);
-
-    return buffer_ptr.count;
+// TODO: Dynamically shrink buffer in the event the data is dynamic. Might have to redo the buffer with DYNAMIC_DRAW?
+shrink_buffer :: proc (buffer: ^types.Buffer, shrink_size_byte: u64, indent: string = "  ") {
+    panic("Unimplemented");
 }
 
-_validate_buffer_params :: proc (buffer: types.Buffer, indent: string = "  ") -> types.BufferError {
+// TODO: Copy all buffer contents into a new buffer of the same type, and support coying slices too.
+copy_buffer :: proc (buffer: ^types.Buffer, buffer_size_byte: u64, buffer_count_vertex: u64, indent: string = "  ") {
+    panic("Unimplemented");
+}
+
+// TODO: Add more constraints depending on buffer type for maximum compatibility, since older versions have other requirements.
+validate_buffer_params :: proc (buffer: types.Buffer, indent: string = "  ") -> types.BufferError {
     if buffer.capacity >= C_VBO_SIZE_LIMIT {
         fmt.printfln("[ERR]:{}--- Buffer capacity '{}' for ('{}') exceeds the maximum allowed bytes ({})", indent,
         buffer.capacity, buffer.id, C_VBO_SIZE_LIMIT);
@@ -119,7 +127,7 @@ _validate_buffer_params :: proc (buffer: types.Buffer, indent: string = "  ") ->
     return types.BufferError.None;
 }
 
-_match_buffer :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferType) -> ^types.Buffer {
+match_buffer :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferType) -> ^types.Buffer {
     switch buffer_type {
     case types.BufferType.vbo:
         return &renderer_ptr.vbo;
@@ -138,11 +146,11 @@ _match_buffer :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferT
     panic("Error matching buffer: Buffer type unsupported!");
 }
 
-_find_buffer :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferType, id: u32, indent: string = "  ") -> ^types.Buffer {
+find_buffer :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferType, id: u32, indent: string = "  ") -> ^types.Buffer {
     assert(renderer_ptr != nil, "Error when finding buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
 
     fmt.printf("[INFO]:{}| Finding buffer of type '{}' and id '{}' ... ", indent, buffer_type, id);
-    buffer_ptr := _match_buffer(renderer_ptr, buffer_type);
+    buffer_ptr := match_buffer(renderer_ptr, buffer_type);
 
     if buffer_ptr.id != id {
         fmt.printfln("\n[ERR]:{}--- Error finding buffer: Buffer not found", indent);

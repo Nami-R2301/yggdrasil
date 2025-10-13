@@ -5,11 +5,11 @@ import utils "utils"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////// LOW LEVEL API //////////////////////////////////////////////
+//////////////////////////////////////////////////// CORE //////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Low-level API to sanitize a config file and auto-generate default values for any option missing or set
+// Core API to sanitize a config file and auto-generate default values for any option missing or set
 // to none.
 //
 // @param   *config*: An optional map of features that will configure the current context. Keys with none values
@@ -17,16 +17,16 @@ import utils "utils"
 //                    config is provided.
 // @param   *indent*: The depth of the indent for all logs within this function.
 // @return  A sanitized version of the config provided as input.
-_sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(string)) = nil, indent: string = "  ") -> (types.ConfigError, types.Option(map[string]string)) {
+sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(string)) = nil, indent: string = "  ") -> types.Result(map[string]string) {
     new_config := utils.default_config();
     config_read: map[string]types.Option(string) = {};
     if !utils.is_some(config_opt) {
         // Attempt to read from toml file.
-        error, config_toml := _read_config();
-        if error != types.ConfigError.None {
-            return error, utils.none(map[string]string);
+        result_config := read_config();
+        if result_config.error != types.ConfigError.None {
+            return { error = result_config.error, opt = utils.none(map[string]string) };
         }
-        config_read = utils.unwrap(config_toml);
+        config_read = utils.unwrap(result_config.opt);
     }
 
     for key, value_opt in config_read {
@@ -60,10 +60,10 @@ _sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(strin
                 }
         }
     }
-    return types.ConfigError.None, utils.some(new_config);
+    return { error = types.ConfigError.None, opt = utils.some(new_config) };
 }
 
-// Low-level API to attempt to read the yggdrasil config toml file and return its options with a key-value
+// Core API to attempt to read the yggdrasil config toml file and return its options with a key-value
 // map, where any features missing in the file, will result in none. When parsed, they will default to
 // their respective default values.
 //
@@ -71,6 +71,6 @@ _sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(strin
 // @return  An error if one occurred and an optional map of key-value pairs corresponding to features
 //          and options available for configuring the context if no errors occurred.
 // TODO: Read from file.
-_read_config :: proc (indent: string = "  ") ->  (types.ConfigError, types.Option(map[string]types.Option(string))) {
+read_config :: proc (indent: string = "  ") ->  types.Result(map[string]types.Option(string)) {
     panic("Unimplemented");
 }
