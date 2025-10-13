@@ -1,16 +1,10 @@
-all: test
+all: test example
 
-dev: src
-	odin build -collection:ygg=./src -file -out:bin/yggdrasil
-
-release: src
-	odin build -collection:ygg=./src -file -o:speed -out:bin/yggdrasil
-
-test: dev
+test:
 	odin test tests -collection:ygg=./src
 
 example:
-	odin build examples -collection:ygg=./src -file
+	odin build examples -collection:ygg=./src -file -out:bin/example
 
 .PHONY: clean
 clean:
