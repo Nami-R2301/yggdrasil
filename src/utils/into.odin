@@ -52,7 +52,6 @@ into_bool :: proc (value: any) -> bool {
     }
     case int:                           return v >= 0;
     case types.Node:                    return v.tag != "N/A" && v.parent != nil;
-    case types.Error:                   return v == types.ContextError.None || v == types.RendererError.None;
     case types.Result(types.Context):   return v.error == types.ContextError.None && is_some(v.opt);
     case types.Result(types.Node):      return v.error == types.NodeError.None && is_some(v.opt);
     case types.Option(int):             return is_some(v) && unwrap(v) >= 0;

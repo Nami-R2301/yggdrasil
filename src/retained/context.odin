@@ -125,25 +125,24 @@ destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.Er
 
     if ctx.root != nil {
         new_indent , _ := strings.concatenate({ indent, "  " });
-        _ = destroy_node(ctx, ctx.root.id, new_indent);
+        destroy_node(ctx, ctx.root.id, new_indent);
         delete_string(new_indent);
         free(ctx.root);
     }
 
     if ctx.renderer != nil {
-        _ = core.destroy_renderer(ctx.renderer);
-    }
-
-    if level >= LogLevel.Verbose {
-        fmt.printf("[INFO]:{}  | Destroying window (%p)...", indent, ctx.window);
+        new_indent := strings.concatenate({indent, "  "});
+        core.destroy_renderer(ctx.renderer);
+        delete_string(new_indent);
     }
 
     if ctx.window != nil {
-        glfw.DestroyWindow(ctx.window.glfw_handle);
+        new_indent := strings.concatenate({indent, "  "});
+        core.destroy_window(ctx.window, new_indent);
+        delete_string(new_indent);
     }
 
     if level >= LogLevel.Normal {
-        fmt.println(" Done");
         fmt.printfln("[INFO]:{}--- Done", indent);
     }
 

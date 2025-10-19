@@ -40,28 +40,21 @@ create_buffer :: proc (
         return { error = error, opt = none(Buffer) };
     }
 
-    gl.CreateBuffers(1, &buffer.id);
+    gl.GenBuffers(1, &buffer.id);
 
     fmt.printfln("[INFO]:{}--- Done", indent);
     return { error = BufferError.None, opt = some(buffer) };
 }
 
 destroy_buffer :: proc (
-    renderer_ptr:   ^types.Renderer,
     buffer_type:    types.BufferType,
     id:             u32,
     indent:         string = "  ") -> types.BufferError {
     using types;
-
-    assert(renderer_ptr != nil, "Error when destroying buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
     fmt.printfln("[INFO]:{}| Destroying buffer of type '{}' ('') ...", indent, buffer_type, id);
 
-    id_ptr := find_buffer(renderer_ptr, buffer_type, id);
-    if id_ptr == nil {
-        return BufferError.BufferNotFound;
-    }
-
-    gl.DeleteBuffers(1, &id_ptr.id);
+    id_ptr := id;
+    gl.DeleteBuffers(1, &id_ptr);
 
     fmt.printfln("[INFO]:{}--- Done", indent);
     return BufferError.None;
@@ -72,13 +65,6 @@ reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") {
     panic("Unimplemented");
 }
 
-// TODO: Load shader program, init 2D settings, draw all vertices, and revert 2D settings in case renderer is used elsewhere.
-render_now :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
-    assert(renderer_ptr != nil, "Error when rendering: No renderer setup! Did you forget to first call '_create_renderer()'?");
-
-    gl.DrawArrays(gl.TRIANGLES, 0, i32(renderer_ptr.vbo.count));
-}
-
 // TODO: Bind buffer for static drawing into VRAM in its appropriate location with data passed optionally to init.
 prepare_buffer :: proc (
     buffer:         ^types.Buffer,
@@ -87,14 +73,8 @@ prepare_buffer :: proc (
     panic("Unimplemented");
 }
 
-// TODO: Put buffer in draw pipeline to render later, depending on the type.
-attach_buffer :: proc (renderer_ptr: ^types.Renderer, buffer: ^types.Buffer, indent: string = "  ") {
-    assert(renderer_ptr != nil, "Error when attaching buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
-    panic("Unimplemented");
-}
-
 // TODO: Pack node styling and properties into appropriate uniforms and vertex data to pass to shader later on.
-serialize_nodes :: proc (node: []types.Node, indent: string = "  ") -> types.Result([]byte) {
+serialize_nodes :: proc (root: ^types.Node, indent: string = "  ") -> types.Result([]byte) {
     panic("Unimplemented");
 }
 
@@ -127,37 +107,47 @@ validate_buffer_params :: proc (buffer: types.Buffer, indent: string = "  ") -> 
     return types.BufferError.None;
 }
 
-match_buffer :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferType) -> ^types.Buffer {
-    switch buffer_type {
-    case types.BufferType.vbo:
-        return &renderer_ptr.vbo;
-    case types.BufferType.vao:
-        return &renderer_ptr.vao;
-    case types.BufferType.ibo:
-        return &renderer_ptr.ibo;
-    case types.BufferType.ubo:
-        return raw_data(renderer_ptr.ubos);
-    case types.BufferType.framebuffer:
-        return raw_data(renderer_ptr.framebuffers);
-    case types.BufferType.texture:
-        return raw_data(renderer_ptr.textures);
+get_last_program :: proc () -> types.Result(u32) {
+    program_id: i32 = 0;
+
+    gl.GetIntegeri_v(gl.CURRENT_PROGRAM, 0, &program_id);
+    if program_id <= 0 {
+        return { error = types.ProgramError.ProgramNotFound, opt = utils.none(u32) };
     }
 
-    panic("Error matching buffer: Buffer type unsupported!");
+    return { error = types.ProgramError.None, opt = utils.some(u32(program_id)) };
 }
 
-find_buffer :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferType, id: u32, indent: string = "  ") -> ^types.Buffer {
-    assert(renderer_ptr != nil, "Error when finding buffer: No renderer setup! Did you forget to first call '_create_renderer()'?");
+get_last_vbo :: proc () -> types.Result(u32) {
+    vbo_id: i32 = 0;
 
-    fmt.printf("[INFO]:{}| Finding buffer of type '{}' and id '{}' ... ", indent, buffer_type, id);
-    buffer_ptr := match_buffer(renderer_ptr, buffer_type);
-
-    if buffer_ptr.id != id {
-        fmt.printfln("\n[ERR]:{}--- Error finding buffer: Buffer not found", indent);
-        return nil;
+    gl.GetIntegeri_v(gl.ARRAY_BUFFER_BINDING, 0, &vbo_id);
+    if vbo_id <= 0 {
+        return { error = types.BufferError.BufferNotFound, opt = utils.none(u32) };
     }
 
-    fmt.printfln("Done ('{}')", id);
-    return buffer_ptr;
+    return { error = types.BufferError.None, opt = utils.some(u32(vbo_id)) };
+}
+
+get_last_ibo :: proc () -> types.Result(u32) {
+    ibo_id: i32 = 0;
+
+    gl.GetIntegerv(gl.ELEMENT_ARRAY_BUFFER_BINDING, &ibo_id);
+    if ibo_id <= 0 {
+        return { error = types.BufferError.BufferNotFound, opt = utils.none(u32) };
+    }
+
+    return { error = types.BufferError.None, opt = utils.some(u32(ibo_id)) };
+}
+
+get_last_vao :: proc () -> types.Result(u32) {
+    vao_id: i32 = 0;
+
+    gl.GetIntegerv(gl.VERTEX_ARRAY_BINDING, &vao_id);
+    if vao_id <= 0 {
+        return { error = types.BufferError.BufferNotFound, opt = utils.none(u32) };
+    }
+
+    return { error = types.BufferError.None, opt = utils.some(u32(vao_id)) };
 }
 

@@ -13,4 +13,5 @@ Window :: struct {
 WindowError :: enum u8 {
     None = 0,
     InitError,
+    InvalidWindow
 }

@@ -6,6 +6,6 @@ package examples;
 main :: proc () {
     immediate();
     retained();
-    config();
+//    config();
 }
 

@@ -1,8 +1,8 @@
 package ygg;
 
-import gl "vendor:OpenGL";
-
-import types "types";
+//import types "types";
+//import utils "utils"
+//import strings "core:strings";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10,15 +10,15 @@ import types "types";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-load_shader :: proc (
-    filepath: string = "./res/shader/main.glsl",
-    shader_type: types.ShaderType) -> types.ShaderError {
-    using types;
+// TODO: Use freetype to load the glyph atlas into memory with predefined max sizes.
+load_font :: proc (filepath: string = "./res/font/default.ttf") {
 
-    _, has_error := gl.load_shaders("./res/main.vert", "./res/main.frag");
-    if has_error {
-        return ShaderError.ProgramError;
-    }
-
-    return ShaderError.None;
 }
+
+// TODO: Use stb-image to load the image into memory.
+load_image :: proc (filepath: string = "./res/images/triangle_hello_world.jpg") {
+
+}
+
+
+

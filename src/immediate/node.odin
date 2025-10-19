@@ -216,7 +216,7 @@ properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
 // High level API to create a h1-h9 node.
 title :: proc (
 ctx:        ^types.Context,
-content:    string,
+text:       string,
 is_inline:  bool = false,
 style:      map[string]types.Option(string) = {},
 properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {

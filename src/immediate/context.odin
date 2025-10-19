@@ -27,9 +27,9 @@ import utils "../utils";
 // @param       *renderer_handle*:  A pointer referring to a renderer that will be used to render nodes.
 // @return      An error if one occurred and if the context has been setup successfully.
 init_context :: proc (
-window_handle:   ^types.Window   = nil,
-renderer_handle: ^types.Renderer = nil,
-custom_config:   map[string]string = {}) -> types.Result(types.Context) {
+    window_handle:   ^types.Window   = nil,
+    renderer_handle: ^types.Renderer = nil,
+    custom_config:   map[string]string = {}) -> types.Result(types.Context) {
     using types;
     using utils;
 
@@ -45,7 +45,7 @@ custom_config:   map[string]string = {}) -> types.Result(types.Context) {
 
     level : LogLevel = into_debug(parsed_config["log_level"]);
 
-    new_window := window_handle;
+    new_window   := window_handle;
     new_renderer := renderer_handle;
 
     if level >= LogLevel.Verbose {
@@ -61,11 +61,11 @@ custom_config:   map[string]string = {}) -> types.Result(types.Context) {
         new_window = new_clone(unwrap(result.opt));
     }
 
-    if new_renderer == nil && into_bool(parsed_config["renderer"]) {
+    if new_window != nil && new_renderer == nil && into_bool(parsed_config["renderer"]) {
         if level >= LogLevel.Verbose {
             fmt.printfln("[WARN]:  --- No renderer handle found, creating one ...");
         }
-        result_renderer := core.create_renderer(type = RendererType.OpenGL, bg_color = 0x181818);
+        result_renderer := core.create_renderer(type = RendererType.OpenGL);
         if result_renderer.error != RendererError.None {
             return { error = RendererError.InitError, opt = none(Context) };
         }
