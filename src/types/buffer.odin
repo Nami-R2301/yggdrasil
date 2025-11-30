@@ -1,11 +1,13 @@
 package types;
 
 Buffer :: struct {
-    id: u32,
-    type: BufferType,
+    attachments_opt: []u32,
     size: u64,
     count: u64,
-    capacity: u64
+    capacity: u64,
+    length: u64,
+    id: u32,
+    type: BufferType
 }
 
 BufferError :: enum u8 {
@@ -14,14 +16,14 @@ BufferError :: enum u8 {
     BufferNotFound,
     InvalidSize,
     ExceededMaxSize,
+    InvalidAttachments  // Something went wrong when setting up texture-based attachments for framebuffer
 }
 
 BufferType :: enum u8 {
-    vbo = 0,
-    vao,
-    ibo,
-    ubo,
-    framebuffer,
-    texture
+    Vbo = 0,
+    Vao,
+    Ibo,
+    Ubo,
+    Framebuffer,
 }
 

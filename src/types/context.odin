@@ -20,13 +20,10 @@ Context :: struct {
   window:                   ^Window,
   root:                     ^Node,
   last_node:                ^Node,
-  cursor:                   Dimension,
   renderer:                 ^Renderer,
   node_pairs:               queue.Queue(Node),
   config:                   map[string]string,
-  mouseEventHandlers:       map[Id]MouseEvent, 
-  keyboardEventHandlers:    map[Id]KeyboardEvent,
-  nodes_created:            Id
+  cursor:                   Dimension,
 }
 
 // Errors regarding the overall app context.

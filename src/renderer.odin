@@ -55,9 +55,10 @@ create_renderer :: proc (
         state = RendererState.Initialized
     };
 
-    vertex_error   := load_shader(filepath = "./res/main.vert", shader_type = ShaderType.Vertex);
-    fragment_error := load_shader(filepath = "./res/main.frag", shader_type = ShaderType.Vertex);
-    assert(vertex_error == ShaderError.None && fragment_error == ShaderError.None, "Error loading vertex and fragment shaders");
+    program_id, error   := load_shaders(filepaths = {"./res/main.vert", "./res/main.frag"});
+    assert(error == ShaderError.None, "Error loading vertex and fragment shaders");
+
+    renderer.program = program_id;
 
     fmt.printfln("[INFO]:{}--- Done", indent);
     return { error = RendererError.None, opt = utils.some(renderer) };
@@ -150,21 +151,21 @@ _create_initial_buffers :: proc () -> (types.Buffer, types.Buffer, types.Buffer)
 
     buffer_vao := Buffer {
         id          = vao,
-        type        = BufferType.vao,
+        type        = BufferType.Vao,
         capacity    = 1,
         count       = 0,
         size        = 0
     };
     buffer_vbo := Buffer {
         id          = vbo,
-        type        = BufferType.vbo,
+        type        = BufferType.Vbo,
         capacity    = 1_000_000,
         count       = 0,
         size        = 0
     };
     buffer_ibo := Buffer {
         id          = ibo,
-        type        = BufferType.ibo,
+        type        = BufferType.Ibo,
         capacity    = 1_000_000,
         count       = 0,
         size        = 0

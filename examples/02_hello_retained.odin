@@ -38,7 +38,7 @@ retained :: proc () {
     serde_result  := rt.serialize_nodes(ctx.root);
 
     // Allocate space in the buffer, bind it to its respective type, and optionally init with given data.
-    buffer_error  := rt.prepare_buffer(&renderer_handle.vbo, data = unwrap(serde_result.opt));
+    buffer_error  := rt.prepare_buffer(&renderer_handle.vbo, opt_data = serde_result.opt);
 
     for ygg.is_window_running(&ctx) {
         glfw.PollEvents();

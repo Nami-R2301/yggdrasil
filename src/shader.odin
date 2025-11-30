@@ -2,7 +2,7 @@ package ygg;
 
 import gl "vendor:OpenGL";
 
-import types "types";
+import types "types"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10,15 +10,13 @@ import types "types";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-load_shader :: proc (
-    filepath: string = "./res/shader/main.glsl",
-    shader_type: types.ShaderType) -> types.ShaderError {
+load_shaders :: proc (filepaths: []string = {}) -> (u32, types.ShaderError) {
     using types;
 
-    _, has_error := gl.load_shaders("./res/main.vert", "./res/main.frag");
-    if has_error {
-        return ShaderError.ProgramError;
+    program_id, is_ok := gl.load_shaders(filepaths[0], filepaths[1]);
+    if !is_ok {
+        return program_id, ShaderError.ProgramError;
     }
 
-    return ShaderError.None;
+    return program_id, ShaderError.None;
 }

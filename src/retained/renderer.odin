@@ -41,18 +41,16 @@ render_now :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") {
 
 match_buffer :: proc (renderer_ptr: ^types.Renderer, buffer_type: types.BufferType) -> ^types.Buffer {
     switch buffer_type {
-    case types.BufferType.vbo:
+    case types.BufferType.Vbo:
         return &renderer_ptr.vbo;
-    case types.BufferType.vao:
+    case types.BufferType.Vao:
         return &renderer_ptr.vao;
-    case types.BufferType.ibo:
+    case types.BufferType.Ibo:
         return &renderer_ptr.ibo;
-    case types.BufferType.ubo:
+    case types.BufferType.Ubo:
         return raw_data(renderer_ptr.ubos);
-    case types.BufferType.framebuffer:
+    case types.BufferType.Framebuffer:
         return raw_data(renderer_ptr.framebuffers);
-    case types.BufferType.texture:
-        return raw_data(renderer_ptr.textures);
     }
 
     panic(fmt.aprintf("Error matching buffer '{}': Buffer type unsupported!", buffer_type));

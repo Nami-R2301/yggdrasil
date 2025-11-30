@@ -1,6 +1,5 @@
 package retained;
 
-import glfw "vendor:glfw";
 import fmt "core:fmt";
 import strings "core:strings";
 
@@ -47,9 +46,6 @@ create_context :: proc (
         cursor                  = { 0, 0 },
         renderer                = renderer_handle,
         config                  = config,
-        nodes_created           = 0,
-        keyboardEventHandlers   = {},
-        mouseEventHandlers      = {},
     };
 
     if level != LogLevel.None {
@@ -87,9 +83,6 @@ reset_context :: proc (ctx: ^types.Context, indent: string = "  ") {
     ctx.window = nil;
     ctx.cursor = { 0, 0 };
     ctx.last_node = nil;
-    ctx.nodes_created = 0;
-    ctx.keyboardEventHandlers = {};
-    ctx.mouseEventHandlers = {};
 
     delete_map(ctx.config);
     ctx.config = {};

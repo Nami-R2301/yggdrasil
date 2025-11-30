@@ -50,6 +50,5 @@ end_frame :: proc (ctx: ^types.Context) {
     free(ctx.root);
     ctx.root = nil;
     ctx.last_node = nil;
-    ctx.nodes_created = 0;
 }
 

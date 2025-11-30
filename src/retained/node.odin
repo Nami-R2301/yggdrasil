@@ -62,9 +62,8 @@ create_node :: proc (
         indent, new_id);
     }
 
-    if !is_some(id) {
-        new_id = int(ctx.nodes_created);
-        ctx.nodes_created += 1;
+    if !is_some(id) && parent != nil {
+        new_id = int(parent.id + Id(len(parent.children) + 1));
     }
 
     if level >= LogLevel.Verbose {
