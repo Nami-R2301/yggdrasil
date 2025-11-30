@@ -1,11 +1,11 @@
-package retained;
+package ygg;
 
 import gl "vendor:OpenGL";
 import fmt "core:fmt";
-
-import types "../types";
-import utils "../utils"
 import strings "core:strings";
+
+import types "types";
+import utils "utils"
 
 C_VBO_SIZE_LIMIT: u64 = 10_000_000;
 
@@ -48,13 +48,12 @@ create_buffer :: proc (
     indent:         string = "  ") -> types.Result(types.Buffer) {
     using types;
 
-    buffer := types.Buffer {
+    buffer := Buffer {
         id = 0,
         type = buffer_type,
-        size = 0,
         count = 0,
+        length = 0,
         capacity = capacity,
-        length = 0
     };
 
     fmt.printf("\n[INFO]:{}| Creating buffer of type '{}' and capacity of '{}' ... ", indent, buffer_type, capacity);
@@ -74,10 +73,6 @@ create_buffer :: proc (
             break;
         case BufferType.Vbo:
             gl.GenBuffers(1, &buffer.id);
-        case BufferType.Ibo:
-            gl.GenBuffers(1, &buffer.id);
-        case BufferType.Ubo:
-            gl.GenBuffers(1, &buffer.id);
         case:
             panic("Unimplemented");
     }
@@ -87,14 +82,13 @@ create_buffer :: proc (
 }
 
 destroy_buffer :: proc (
-    buffer_type:    types.BufferType,
-    id:             u32,
-    indent:         string = "  ") -> types.BufferError {
+    buffer:    ^types.Buffer,
+    indent:    string = "  ") -> types.BufferError {
     using types;
-    fmt.printf("\n[INFO]:{}| Destroying buffer of type '{}' ('') ... ", indent, buffer_type, id);
 
-    id_ptr := id;
-    gl.DeleteBuffers(1, &id_ptr);
+    fmt.printf("\n[INFO]:{}| Destroying buffer of type '{}' ('') ... ", indent, utils.into_str(buffer));
+
+    gl.DeleteBuffers(1, &buffer.id);
 
     fmt.print("Done");
     return BufferError.None;
@@ -104,7 +98,7 @@ destroy_buffer :: proc (
 reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> types.BufferError {
     using types;
 
-    fmt.printf("\n[INFO]:{}| Resetting buffer '{}' ({}) ... ", indent, buffer.id, buffer.type);
+    fmt.printf("\n[INFO]:{}| Resetting buffer ({}) ... ", indent, utils.into_str(buffer));
 
     buffer.length = 0;
     buffer.count = 0;
@@ -114,9 +108,14 @@ reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> types.Buf
 
 prepare_buffer :: proc (
     buffer:         ^types.Buffer,
-    opt_data:       types.Option([]u8) = nil,
+    opt_data:       types.Data = {},
     indent:         string = "  ") -> types.BufferError {
     using types;
+
+    inner_indent := strings.concatenate({indent, "        "});
+    defer delete(inner_indent);
+
+    fmt.printfln("[INFO]:{}| Preparing buffer ({}) ... ", indent, utils.into_str(buffer, inner_indent));
 
     switch buffer.type {
         case BufferType.Framebuffer:
@@ -136,18 +135,20 @@ prepare_buffer :: proc (
             break;
         case BufferType.Vbo:
             gl.BindBuffer(gl.ARRAY_BUFFER, buffer.id);
-            gl.BufferData(gl.ARRAY_BUFFER, int(buffer.capacity), raw_data(utils.unwrap_or(opt_data, nil)), gl.DYNAMIC_DRAW);
-            break;
-        case BufferType.Ibo:
-            gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer.id);
-            gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, int(buffer.capacity), raw_data(utils.unwrap_or(opt_data, nil)), gl.DYNAMIC_DRAW);
-            break;
-        case BufferType.Ubo:
-            gl.BindBuffer(gl.UNIFORM_BUFFER, buffer.id);
-            gl.BufferData(gl.UNIFORM_BUFFER, int(buffer.capacity), raw_data(utils.unwrap_or(opt_data, nil)), gl.DYNAMIC_DRAW);
+            gl.BufferData(gl.ARRAY_BUFFER, int(buffer.capacity), nil, gl.DYNAMIC_DRAW);
             break;
         case:
             panic("Unimplemented");
+    }
+
+    if opt_data.ptr != nil {
+        new_indent := strings.concatenate({indent, "  "});
+        defer delete(new_indent);
+
+        if err := push_data(buffer, opt_data, indent = new_indent); err != BufferError.None {
+            hasError := restore_last_buffer_state(buffer);
+            return err;
+        }
     }
 
     hasError := restore_last_buffer_state(buffer);
@@ -155,6 +156,7 @@ prepare_buffer :: proc (
         return BufferError.BufferNotFound;
     }
 
+    fmt.printfln("[INFO]:{}--- Done", indent);
     return BufferError.None;
 }
 
@@ -228,116 +230,65 @@ migrate_buffer :: proc (
 
 push_data :: proc (
     buffer:           ^types.Buffer,
-    data:             []byte,
+    data:             types.Data,
     from_where_bytes: types.Option(u64) = nil,
     indent:           string = "  ") -> types.BufferError {
     using types;
 
-    size_bytes       := u64(len(data));
-    fmt.printfln("[INFO]:{}| Appending data ({}) of {} bytes into buffer {} at {}/{} ... ", indent, data, size_bytes, buffer.id,
-        from_where_bytes, buffer.capacity);
+    from_where := utils.unwrap_or(from_where_bytes, buffer.length);
+    size_bytes := data.count * data.size;
+    fmt.printf("[INFO]:{}| [{}] Appending data (count = {}, size = %2d) at {}/{} ... ", indent,
+        buffer.type, data.count, data.size, from_where, buffer.capacity);
 
     if buffer.length + size_bytes > buffer.capacity {
-        fmt.printfln("[WARN]:{}--- Data too big ({}) for buffer's capacity ({}), growing it ...", indent, size_bytes, buffer.capacity);
+        fmt.printfln("\n[WARN]:{}--- Data too big ({}) for buffer's capacity ({}), growing it ...", indent, size_bytes, buffer.capacity);
         if err := grow_buffer(buffer, size_bytes); err != BufferError.None {
             return err;
         }
     }
 
     gl.BindBuffer(_into_gl_type(buffer.type), buffer.id);
-    gl.BufferSubData(_into_gl_type(buffer.type), int(utils.unwrap_or(from_where_bytes, buffer.length)), int(size_bytes), raw_data(data));
+    gl.BufferSubData(_into_gl_type(buffer.type), int(from_where), int(size_bytes), data.ptr);
     restore_last_buffer_state(buffer);
 
     buffer.length += size_bytes;
-    buffer.count  += size_bytes / buffer.size;
-    fmt.printfln("[INFO]:{}--- Done", indent);
+    buffer.count  += data.count;
+    fmt.printfln("Done ({}/{})", buffer.length, buffer.capacity);
     return BufferError.None;
 }
 
 pop_data :: proc (
     buffer:           ^types.Buffer,
     size_bytes:       u64,
+    count:            u64,
     from_where_bytes: types.Option(u64) = nil,
-    indent:           string = "  ") -> types.Result([]byte) {
+    indent:           string = "  ") -> types.Result(types.Data) {
     using types;
 
-    fmt.printfln("[INFO]:{}| Popping data of {} bytes from buffer {} at {}/{} ... ", indent, size_bytes, buffer.id,
-    buffer.length, buffer.capacity);
+    from_where := utils.unwrap_or(from_where_bytes, buffer.length);
+    fmt.printf("[INFO]:{}| [{}] | Popping {} bytes at {}/{} ... ", indent, buffer.type, size_bytes, from_where, buffer.capacity);
 
     if buffer.length - size_bytes < 0 {
-        fmt.printfln("[ERR]:{}--- Cannot pop data from buffer: Bytes requested ({}) would underflow the buffer's capacity ({}). ",
+        fmt.printfln("\n[ERR]:{}--- Cannot pop data from buffer: Bytes requested ({}) would underflow the buffer's capacity ({}). ",
             indent, size_bytes, buffer.capacity);
-        return { opt = utils.none([]byte), error = BufferError.InvalidSize };
+        return { opt = utils.none(types.Data), error = BufferError.InvalidSize };
     }
 
-    from_where := utils.unwrap_or(from_where_bytes, buffer.length);
-    get_data : []byte = {};
+    get_data : rawptr;
 
     gl.BindBuffer(_into_gl_type(buffer.type), buffer.id);
-    gl.BufferSubData(_into_gl_type(buffer.type), int(from_where), int(size_bytes), nil);
-    gl.GetBufferSubData(_into_gl_type(buffer.type), int(from_where), int(size_bytes), &get_data);
+    gl.BufferSubData(_into_gl_type(buffer.type), int(from_where), int(size_bytes * count), nil);
+    gl.GetBufferSubData(_into_gl_type(buffer.type), int(from_where), int(size_bytes * count), get_data);
     restore_last_buffer_state(buffer);
 
     buffer.length -= size_bytes;
-    buffer.count  -= size_bytes / buffer.size;
-    fmt.printfln("[INFO]:{}--- Done", indent);
-    return { opt = utils.some(get_data), error = BufferError.None };
+    buffer.count  -= count;
+    fmt.println("Done");
+    return { opt = utils.some(Data{ ptr = get_data, count = count, size = size_bytes }), error = BufferError.None };
 }
 
 // TODO: Pack node styling and properties into appropriate uniforms and vertex data to pass to shader later on.
 serialize_nodes :: proc (root: ^types.Node, indent: string = "  ") -> types.Result([]byte) {
-    panic("Unimplemented");
-}
-
-get_last_program :: proc () -> types.Result(u32) {
-    program_id: i32 = 0;
-
-    gl.GetIntegeri_v(gl.CURRENT_PROGRAM, 0, &program_id);
-    if program_id <= 0 {
-        return { error = types.ProgramError.ProgramNotFound, opt = utils.none(u32) };
-    }
-
-    return { error = types.ProgramError.None, opt = utils.some(u32(program_id)) };
-}
-
-get_last_vao :: proc () -> types.Result(u32) {
-    vao_id: i32 = 0;
-
-    gl.GetIntegerv(gl.VERTEX_ARRAY_BINDING, &vao_id);
-    if vao_id <= 0 {
-        return { error = types.BufferError.BufferNotFound, opt = utils.none(u32) };
-    }
-
-    return { error = types.BufferError.None, opt = utils.some(u32(vao_id)) };
-}
-
-get_last_vbo :: proc () -> types.Result(u32) {
-    vbo_id: i32 = 0;
-
-    gl.GetIntegeri_v(gl.ARRAY_BUFFER_BINDING, 0, &vbo_id);
-    if vbo_id <= 0 {
-        return { error = types.BufferError.BufferNotFound, opt = utils.none(u32) };
-    }
-
-    return { error = types.BufferError.None, opt = utils.some(u32(vbo_id)) };
-}
-
-get_last_ibo :: proc () -> types.Result(u32) {
-    ibo_id: i32 = 0;
-
-    gl.GetIntegerv(gl.ELEMENT_ARRAY_BUFFER_BINDING, &ibo_id);
-    if ibo_id <= 0 {
-        return { error = types.BufferError.BufferNotFound, opt = utils.none(u32) };
-    }
-
-    return { error = types.BufferError.None, opt = utils.some(u32(ibo_id)) };
-}
-
-get_last_ubo :: proc() -> types.Result(u32) {
-    panic("Unimplemented");
-}
-
-get_last_framebuffer :: proc() -> types.Result(u32) {
     panic("Unimplemented");
 }
 
@@ -357,18 +308,6 @@ restore_last_buffer_state :: proc(current_buffer: ^types.Buffer) -> bool {
                 gl.BindBuffer(gl.ARRAY_BUFFER, vbo_id);
             }
             return last_vbo.error != BufferError.None;
-        case BufferType.Ibo:
-            last_ibo := get_last_ibo();
-            if ibo_id := utils.unwrap(last_ibo.opt); utils.is_some(last_ibo.opt) {
-                gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo_id);
-            }
-            return last_ibo.error != BufferError.None;
-        case BufferType.Ubo:
-            last_ubo := get_last_ubo();
-            if ubo_id := utils.unwrap(last_ubo.opt); utils.is_some(last_ubo.opt) {
-                gl.BindBuffer(gl.UNIFORM_BUFFER, ubo_id);
-            }
-            return last_ubo.error != BufferError.None;
         case BufferType.Framebuffer:
             last_framebuffer := get_last_framebuffer();
             if framebuffer_id := utils.unwrap(last_framebuffer.opt); utils.is_some(last_framebuffer.opt) {
@@ -382,6 +321,32 @@ restore_last_buffer_state :: proc(current_buffer: ^types.Buffer) -> bool {
     return false;
 }
 
+get_last_vao :: proc () -> types.Result(u32) {
+    vao_id: i32 = 0;
+
+    gl.GetIntegerv(gl.VERTEX_ARRAY_BINDING, &vao_id);
+    if vao_id <= 0 {
+        return { error = types.BufferError.BufferNotFound, opt = utils.none(u32) };
+    }
+
+    return { error = types.BufferError.None, opt = utils.some(u32(vao_id)) };
+}
+
+get_last_vbo :: proc () -> types.Result(u32) {
+    vbo_id: i32 = 0;
+
+    gl.GetIntegerv(gl.ARRAY_BUFFER_BINDING, &vbo_id);
+    if vbo_id <= 0 {
+        return { error = types.BufferError.BufferNotFound, opt = utils.none(u32) };
+    }
+
+    return { error = types.BufferError.None, opt = utils.some(u32(vbo_id)) };
+}
+
+get_last_framebuffer :: proc() -> types.Result(u32) {
+    panic("Unimplemented");
+}
+
 _into_gl_type :: proc (buffer_type: types.BufferType) -> u32 {
     using types;
 
@@ -389,8 +354,17 @@ _into_gl_type :: proc (buffer_type: types.BufferType) -> u32 {
         case BufferType.Framebuffer:    return gl.FRAMEBUFFER;
         case BufferType.Vbo:            return gl.ARRAY_BUFFER;
         case BufferType.Vao:            return gl.VERTEX_ARRAY;
-        case BufferType.Ibo:            return gl.ELEMENT_ARRAY_BUFFER;
-        case BufferType.Ubo:            return gl.UNIFORM_BUFFER;
+        case:                           panic("Unimplemented");
+    }
+}
+
+_get_buffer_unit_size :: proc(buffer_type: types.BufferType) -> uint {
+    using types;
+
+    switch buffer_type {
+        case BufferType.Framebuffer:    return 1;
+        case BufferType.Vbo:            return size_of(Vertex);
+        case BufferType.Vao:            return 1;
         case:                           panic("Unimplemented");
     }
 }

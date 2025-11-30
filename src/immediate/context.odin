@@ -7,12 +7,6 @@ import rt "../retained";
 import types "../types";
 import utils "../utils";
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////// IMMEDIATE API //////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // High-level API to create and setup a new context to attach/render nodes into. Note, that this function
 // unlike its low-level counterpart, does not accept a config. Instead, the config is implicitely read
 // from the config.toml file. This file needs to live alongside the executable's directory to be read
@@ -65,7 +59,7 @@ init_context :: proc (
         if level >= LogLevel.Verbose {
             fmt.printfln("[WARN]:  --- No renderer handle found, creating one ...");
         }
-        result_renderer := core.create_renderer(type = RendererType.OpenGL);
+        result_renderer := core.create_renderer();
         if result_renderer.error != RendererError.None {
             return { error = RendererError.InitError, opt = none(Context) };
         }

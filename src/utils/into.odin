@@ -66,6 +66,7 @@ into_str :: proc {
   into_str_bool,
   into_str_option,
   into_str_node,
+  into_str_buffer,
   into_str_enum,
   into_str_option_ref,
   into_str_ctx,
@@ -79,6 +80,7 @@ into_str_any :: proc (value: any) -> string {
     case types.Option(^types.Node): return into_str_option_ref(types.Node, v);
     case types.LogLevel:            return into_str_enum(v);
     case ^types.Node:               return into_str_node(v);
+    case ^types.Buffer:             return into_str_buffer(v);
     case ^types.Context:            return into_str_ctx(v);
     case:                           return "Unimplemented";
   }
@@ -142,6 +144,16 @@ into_str_node :: proc (node: ^types.Node, indent: string = "  ") -> string {
 into_str_enum :: proc (debug: types.LogLevel, indent: string = "  ") -> string {
   str, _ := fmt.enum_value_to_string(debug); 
   return str;
+}
+
+into_str_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> string {
+  if buffer == nil {
+    return "nil (0x0)";
+  }
+
+  string_builder: strings.Builder = {};
+  return fmt.sbprintf(&string_builder, "{{\n{0}   Id: {},\n{0}   Type: {},\n{0}   Count: {},\n{0}   Length: {},\n{0}   Capacity: {}\n{0} }}",
+  indent, buffer.id, buffer.type, buffer.count, buffer.length, buffer.capacity);
 }
 
 // Try to prettify an object (preferably tree-like) in a JSON-like structure to pass onto 'printf()'.

@@ -3,17 +3,12 @@ package ygg;
 import fmt "core:fmt";
 import strings "core:strings";
 import glfw "vendor:glfw";
-import libc "core:c/libc";
+import c    "core:c";
+import runtime "base:runtime";
+import linalg "core:math/linalg";
 
 import types "types";
-import utils "utils";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////// CORE //////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+import utils "utils"
 
 // Core API to create a window context with either OpenGL or Vulkan as the GPU API.
 //
@@ -27,7 +22,6 @@ import utils "utils";
 create_window :: proc (
     title:          string,
     profile:        string = "debug",
-    target:         types.RendererType = types.RendererType.OpenGL,
     dimensions:     [2]u16 = { 800, 600 },
     offset:         [2]u16 = { 0, 0 },
     refresh_rate:   types.Option(u16) = nil,
@@ -36,11 +30,21 @@ create_window :: proc (
     using utils;
 
     fmt.printfln("[INFO]:{}| Creating window '{}' ... ", indent, title);
+    glfw.SetErrorCallback(glfw_error_callback);
+
     if !bool(glfw.Init()) {
         fmt.eprintfln("[ERR]:{}--- FATAL: Cannot initialize GLFW", indent);
         return { error = WindowError.InitError, opt = none(types.Window) };
     }
     new_window : Window = { };
+
+    glfw.WindowHint(glfw.OPENGL_DEBUG_CONTEXT, profile == "debug");
+    glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 4);
+    glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 3);
+    glfw.WindowHint(glfw.OPENGL_FORWARD_COMPAT, true);
+    glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE);
+    glfw.WindowHint(glfw.MAXIMIZED, true);
+    glfw.WindowHint(glfw.REFRESH_RATE, is_some(refresh_rate) ? i32(unwrap(refresh_rate)) : glfw.DONT_CARE);
 
     window_dimensions := dimensions;
     glfw_handle := glfw.CreateWindow(i32(window_dimensions[0]), i32(window_dimensions[1]),
@@ -49,22 +53,9 @@ create_window :: proc (
     major, minor, _ := glfw.GetVersion();
     fmt.printfln("[INFO]:{}  --- GLFW version: {}.{}", indent, major, minor);
 
-    if target == RendererType.OpenGL {
-        glfw.WindowHint_bool(glfw.OPENGL_DEBUG_CONTEXT, profile == "debug");
-        glfw.WindowHint(glfw.CLIENT_API, glfw.OPENGL_API);
-        glfw.WindowHint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE);
-    } else {
-        // Vulkan
-        glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API);
-    }
-    glfw.WindowHint(glfw.CONTEXT_VERSION_MAJOR, 3);
-    glfw.WindowHint(glfw.CONTEXT_VERSION_MINOR, 3);
-    glfw.WindowHint(glfw.FLOATING, true);
-
-    glfw.WindowHint(glfw.REFRESH_RATE, is_some(refresh_rate) ? i32(unwrap(refresh_rate)) : glfw.DONT_CARE);
-
-    glfw.SwapInterval(1);
     glfw.MakeContextCurrent(glfw_handle);
+    glfw.SetFramebufferSizeCallback(glfw_handle, glfw_framebuffer_callback);
+    glfw.SwapInterval(1);
 
     new_window.glfw_handle = glfw_handle;
     new_window.title = title;
@@ -97,7 +88,24 @@ is_window_running :: proc (ctx: ^types.Context) -> bool {
     return !bool(glfw.WindowShouldClose(ctx.window.glfw_handle));
 }
 
+glfw_framebuffer_callback :: proc "c" (window: glfw.WindowHandle, width, height: c.int) {
+    context = runtime.default_context();
+    fmt.printfln("[INFO]:  | [Resize] Window resized to {}x{}", width, height);
+    projection_matrix := linalg.matrix_ortho3d(
+        0.0,            // Left
+        f32(width),     // Right
+        f32(height),    // Bottom
+        0.0,            // Top (0 puts origin at top-left)
+        -1.0,           // Near
+        1.0             // Far
+    );
+
+    update_viewport_and_camera(width, height);
+}
+
 @(private)
-glfw_error_callback :: proc "c" (error_code: int, description: cstring) {
-    libc.fprintf(libc.stderr, "[GLFW] | [%d] -> [%s]", error_code, description);
+glfw_error_callback :: proc "c" (error_code: i32, description: cstring) {
+    context = runtime.default_context();
+
+    fmt.eprintfln("[ERR]:\t | [Error] [{}] -> {}", error_code, description);
 }

@@ -7,12 +7,6 @@ import helpers "../";
 import types "../types";
 import utils "../utils";
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////// RETAINED API ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // Low-level API to create a custom UI node, to be attached onto the tree later on. This is normally intended
 // to be abstracted away from the programmer behind high-level API entrypoints like 'begin_node'. One might
 // use this function to wait and prevent the automatic rendering mechanisms provided and performed by 'begin_node',
@@ -99,7 +93,7 @@ destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") 
 
     if node_ptr == nil {
         if level >= LogLevel.Normal {
-            fmt.eprintfln("[ERR]:{}--- Error destroying node: Node [{}] not found", indent, id);
+            fmt.eprintfln("[ERR]: {}--- Error destroying node: Node [{}] not found", indent, id);
         }
         return NodeError.NodeNotFound;
     }

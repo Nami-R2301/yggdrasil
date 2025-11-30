@@ -14,7 +14,7 @@ retained :: proc () {
     using types;
     using utils;
 
-    result_window := ygg.create_window("Retained Mode", dimensions = {1920, 1080});
+    result_window := ygg.create_window("Retained Mode");
     window_handle := unwrap(result_window.opt);
 
     result_renderer := ygg.create_renderer();
@@ -35,15 +35,40 @@ retained :: proc () {
     node_error  = rt.attach_node(&ctx, title);
 
     // Serialize the node styles into recognizable draw properties and compile the vertices into compact bytes.
-    serde_result  := rt.serialize_nodes(ctx.root);
+    // serde_result  := rt.serialize_nodes(ctx.root);
 
-    // Allocate space in the buffer, bind it to its respective type, and optionally init with given data.
-    buffer_error  := rt.prepare_buffer(&renderer_handle.vbo, opt_data = serde_result.opt);
+    vertices := [3]Vertex{
+        // Vertex 1: Bottom Left (Red)
+        {
+            entity_id    = 1,
+            position     = { -0.5, -0.5, 0.0 },
+            color        = { 1.0, 0.0, 0.0, 1.0 },
+            tex_coords   = { 0.0, 0.0 },
+        },
+        // Vertex 2: Bottom Right (Green)
+        {
+            entity_id    = 1,
+            position     = { 0.5, -0.5, 0.0 },
+            color        = { 0.0, 1.0, 0.0, 1.0 },
+            tex_coords   = { 1.0, 0.0 },
+        },
+        // Vertex 3: Top Center (Blue)
+        {
+            entity_id    = 1,
+            position     = { 0.0, 0.5, 0.0 },
+            color        = { 0.0, 0.0, 1.0, 1.0 },
+            tex_coords   = { 0.5, 1.0 },
+        },
+    }
+
+    // Allocate space in the buffer, bind it to its respective type
+    vbo_error  := ygg.prepare_buffer(&renderer_handle.vbo, Data { ptr = &vertices, count = 3, size = size_of(Vertex) });
+    assert(vbo_error == BufferError.None, "[ERR]:\tError preparing VBO buffer");
 
     for ygg.is_window_running(&ctx) {
         glfw.PollEvents();
         // Bind the shader, vao, and draw the vertices in the main vbo containing all node data.
-        rt.render_now(ctx.renderer);
+        ygg.render_now(ctx.renderer);
         glfw.SwapBuffers(ctx.window.glfw_handle);
     }
 }

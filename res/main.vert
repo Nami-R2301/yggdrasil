@@ -5,16 +5,12 @@ layout (location = 0) in int  vin_entity_ID;
 layout (location = 1) in vec3 vin_position;
 layout (location = 2) in vec4 vin_color;
 layout (location = 3) in vec2 vin_tex_coords;
-layout (location = 4) in mat4 vin_model_matrix;
 
 // View matrix.
-layout (std140, binding = 0) uniform u_view
-{
-    mat4 u_view;
-} View_u;
+uniform mat4 u_view = mat4(1.0f);
 
 // Input variables.
-uniform vec3 u_mouse_pos;
+uniform vec3 u_mouse_pos = vec3(0.0f);
 
 // Outputs.
 struct Vertex_data_s
@@ -29,10 +25,10 @@ layout (location = 1)       out Vertex_data_s vout_vertex_data;
 
 void main()
 {
-    gl_Position = View_u.u_view * (vin_model_matrix * vec4(vin_position.xyz, 1.0));
+    gl_Position = u_view * vec4(vin_position.xyz, 1.0);
 
     vout_vertex_data.vout_tex_coords    = vin_tex_coords;
     vout_vertex_data.vout_frag_color    = vin_color;
-    vout_vertex_data.vout_frag_position = (vin_model_matrix * vec4(vin_position, 1.0)).xyz;
+    vout_vertex_data.vout_frag_position = vin_position;
     vout_entity_ID                      = vin_entity_ID;
 }

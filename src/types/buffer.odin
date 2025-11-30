@@ -2,10 +2,9 @@ package types;
 
 Buffer :: struct {
     attachments_opt: []u32,
-    size: u64,
     count: u64,
-    capacity: u64,
     length: u64,
+    capacity: u64,
     id: u32,
     type: BufferType
 }
@@ -22,8 +21,19 @@ BufferError :: enum u8 {
 BufferType :: enum u8 {
     Vbo = 0,
     Vao,
-    Ibo,
-    Ubo,
     Framebuffer,
+}
+
+Vertex :: struct #packed {
+    entity_id:  i32,
+    position:   [3]f32,  // x, y, z
+    color:      [4]f32,
+    tex_coords: [2]f32
+}
+
+Data :: struct #packed {
+    ptr: rawptr,
+    count: u64,
+    size: u64
 }
 

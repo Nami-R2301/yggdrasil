@@ -12,14 +12,12 @@ ProgramError :: enum u8 {
 
 Renderer :: struct {
   node_queue:   queue.Queue(Node),
+  textures:     [dynamic]Buffer,
+  vao:          Buffer,
+  vbo:          Buffer,
+  framebuffer:  Buffer,
   program:      Program,
   state:        RendererState,
-  vbo:          Buffer,
-  vao:          Buffer,
-  ibo:          Buffer,
-  ubos:         [dynamic]Buffer,
-  framebuffers: [dynamic]Buffer,
-  textures:     [dynamic]Buffer,
 }
 
 RendererState :: enum u8 {
@@ -37,11 +35,6 @@ RendererError :: enum u8 {
   InitError,
   APIError,
   UnsupportedVersion,
-}
-
-RendererType :: enum u8 {
-  OpenGL = 0,
-  Vulkan = 1
 }
 
 AsyncErrorMessage :: struct {
