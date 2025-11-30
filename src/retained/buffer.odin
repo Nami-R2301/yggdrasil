@@ -100,9 +100,16 @@ destroy_buffer :: proc (
     return BufferError.None;
 }
 
-// TODO: Clear out buffer data, but keep capacity intact in case the space is reused later.
-reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") {
-    panic("Unimplemented");
+// TODO: Check if it is uploaded to GPU and memset it on there as well
+reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> types.BufferError {
+    using types;
+
+    fmt.printf("\n[INFO]:{}| Resetting buffer '{}' ({}) ... ", indent, buffer.id, buffer.type);
+
+    buffer.length = 0;
+    buffer.count = 0;
+    fmt.printfln("[INFO]:{}--- Done", indent);
+    return BufferError.None;
 }
 
 prepare_buffer :: proc (
