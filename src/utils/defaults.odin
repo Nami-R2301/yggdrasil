@@ -46,7 +46,6 @@ default_node :: proc (node: types.Node) -> types.Node {
     tag = "N/A",
     id = 0,
     style = {},
-    properties = {},
     children = {}
   };
 }

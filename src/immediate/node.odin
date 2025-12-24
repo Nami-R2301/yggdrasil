@@ -1,68 +1,63 @@
 package immediate;
 
-import fmt "core:fmt";
-import strings "core:strings";
-import queue "core:container/queue";
+import fmt      "core:fmt";
+import strings  "core:strings";
+import queue    "core:container/queue";
 
-import rt "../retained";
-import helpers "../";
-import types "../types";
-import utils "../utils";
+import rt       "../retained";
+import ygg      "../";
+import types    "../types";
 
 begin_node :: proc (
-ctx:        ^types.Context,
-tag:        string,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {},
-indent: string = "  ") -> types.Result(types.Node) {
+    tag:        string,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {},
+    indent: string = "  ") -> (types.Node, types.Error) {
     using types;
 
-    assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
+    assert(context.user_ptr != nil, "[ERR]:\t| Error creating node: Context is nil!");
+    ctx: ^Context = cast(^Context)context.user_ptr;
 
-    result: Result(Node) = { error = NodeError.None, opt = utils.none(Node) };
-    result.opt = utils.some(rt.create_node(ctx, tag = tag, style = style, properties = properties));
+    node, error := rt.create_node(tag = tag, style = style);
 
-    if result.error != NodeError.None {
-        return result;
+    if error != ContextError.None {
+        return node, error;
     }
-
-    node := utils.unwrap(result.opt);
 
     if queue.len(ctx.node_pairs) > 0 {
         node.parent = queue.back_ptr(&ctx.node_pairs);
     }
 
-    new_indent := strings.concatenate({indent, "  "});
-    error := rt.attach_node(ctx, node, indent);
-    delete_string(new_indent);
+    new_indent := strings.concatenate({indent, "  "}, context.temp_allocator);
+    node_error := rt.attach_node(node, indent = indent);
 
-    if error != NodeError.None {
-        fmt.printfln("[ERR]:{}--- Error beginning node '{}': Cannot attach node -> {}", indent, tag, error);
-        return { error, utils.none(Node) };
+    if node_error != NodeError.None {
+        fmt.printfln("[ERR]:{}--- Error beginning node '{}': Cannot attach node -> {}", indent, tag, node_error);
+        return {}, node_error;
     }
 
     queue.push(&ctx.node_pairs, node);
     if is_inline {
-        error := end_node(ctx, node.tag);
+        error := end_node(node.tag);
         if error != NodeError.None {
-            return { error, utils.none(Node) };
+            return {}, error;
         }
     }
 
-    return result;
+    return node, NodeError.None;
 }
 
-end_node :: proc (ctx: ^types.Context, tag: string, indent: string = "  ") -> types.NodeError {
+end_node :: proc (tag: string, indent: string = "  ") -> types.NodeError {
     using types;
 
-    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
-    new_indent, _ := strings.concatenate({ indent, "  " });
-    node_ptr := helpers.find_node(ctx, tag, indent = new_indent);
-    delete_string(new_indent);
+    assert(context.user_ptr != nil, "[ERR]:\t| Error ending node: Context is nil!");
+    ctx: ^Context = cast(^Context)context.user_ptr;
+
+    new_indent, _ := strings.concatenate({ indent, "  " }, context.temp_allocator);
+    node_ptr      := ygg.find_node(tag, indent = new_indent);
 
     if node_ptr == nil {
-        fmt.printfln("[ERR]:{}| Error ending node: Node given is 'None' ({})", indent, #location())
+        fmt.printfln("[ERR]:{}| Error ending node: Node given is 'None' ({})", indent)
         return NodeError.InvalidNode;
     }
 
@@ -71,167 +66,73 @@ end_node :: proc (ctx: ^types.Context, tag: string, indent: string = "  ") -> ty
     return NodeError.None;
 }
 
-root :: proc (
-ctx:        ^types.Context,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
-
-    return begin_node(ctx, "root", false, style, properties);
-}
-
-head :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
-
-    return begin_node(ctx, "head", is_inline, style, properties);
-}
-
 img :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
 }
 
 input :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
 }
 
 li :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
 }
 
 link :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
 
-    return begin_node(ctx, "link", is_inline, style, properties);
+    return begin_node("link", is_inline, style);
 }
 
 meta :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
 }
 
 nav :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
 }
 
 ol :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    panic("Unimplemented");
-}
-
-p :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
 }
 
 // High Level API to create and link a JS script.
 script :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
-}
-
-span :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    panic("Unimplemented");
-}
-
-table :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    panic("Unimplemented");
-}
-
-td ::proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    panic("Unimplemented");
-
-}
-
-th ::proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    panic("Unimplemented");
-}
-
-tr :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    panic("Unimplemented");
-
 }
 
 // High level API to create a h1-h9 node.
-title :: proc (
-ctx:        ^types.Context,
-text:       string,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
-    assert(ctx != nil, "[ERR]:\t| Error ending node: Context is nil!");
-
-    return begin_node(ctx, "title", is_inline, style, properties);
+text :: proc (
+    str:       string,
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
+    return begin_node("title", is_inline, style);
 }
 
 ul :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
 }
 
 video :: proc (
-ctx:        ^types.Context,
-is_inline:  bool = false,
-style:      map[string]types.Option(string) = {},
-properties: map[string]types.Option(string) = {}) -> types.Result(types.Node) {
+    is_inline:  bool = false,
+    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
     panic("Unimplemented");
 }
 

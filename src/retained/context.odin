@@ -1,11 +1,13 @@
 package retained;
 
-import fmt "core:fmt";
-import strings "core:strings";
+import fmt      "core:fmt";
+import strings  "core:strings";
+import vmem     "core:mem/virtual";
+import mem      "core:mem";
 
 import core "../";
 import types "../types";
-import utils "../utils";
+import utils "../utils"
 
 // Retained API to construct a new context. This is intended to be used by the immediate API, but
 // can prove useful for cases where you would need to explicitely control the lifetime of the context.
@@ -23,9 +25,28 @@ create_context :: proc (
     window_handle:      ^types.Window   = nil,
     renderer_handle:    ^types.Renderer = nil,
     config:             map[string]string,
-    indent:             string = "  ") -> types.Result(types.Context) {
+    indent:             string = "  ") -> (ctx: types.Context, err: types.Error) {
     using types;
     using utils;
+
+    ctx = Context {
+        window                  = window_handle,
+        root                    = nil,
+        last_node               = nil,
+        cursor                  = { 0, 0 },
+        renderer                = renderer_handle,
+        config                  = config,
+        _arena                  = new(vmem.Arena)
+    };
+
+    // This library does not free its individual dynamic allocs. Just put the whole context in an arena and no leaking
+    // will happen as long as you destroy it.
+    if err = vmem.arena_init_growing(ctx._arena, 1 * mem.Gigabyte); err != vmem.Allocator_Error.None {
+        fmt.eprintfln("[ERR]:{} --- Cannot create context: Arena alloc error: {}", indent, err);
+        free(ctx._arena);
+        return {}, ContextError.ArenaAllocFailed;
+    }
+    ctx.allocator = vmem.arena_allocator(ctx._arena);
 
     level : LogLevel = into_debug(config["log_level"]);
 
@@ -33,22 +54,12 @@ create_context :: proc (
         fmt.printfln("[INFO]:{}| Creating context...", indent);
     }
 
-    ctx := Context {
-        window                  = window_handle,
-        root                    = nil,
-        last_node               = nil,
-        cursor                  = { 0, 0 },
-        renderer                = renderer_handle,
-        config                  = config,
-    };
-
     if level != LogLevel.None {
         str := into_str(&ctx, "           ");
         fmt.printfln("[INFO]:{0}--- Done (\n{2} {1}\n         )", indent, str, "          ");
-        delete_string(str);
     }
 
-    return { error = ContextError.None, opt = some(ctx) };
+    return ctx, ContextError.None;
 }
 
 // Retained API to completely reset the context tree, in the event you are conditionally resetting
@@ -77,14 +88,11 @@ reset_context :: proc (ctx: ^types.Context, indent: string = "  ") {
     ctx.window = nil;
     ctx.cursor = { 0, 0 };
     ctx.last_node = nil;
-
-    delete_map(ctx.config);
     ctx.config = {};
 
     if level >= LogLevel.Normal {
         str := into_str(ctx, "    ");
         fmt.printfln("[INFO]:{}--- Done (%p) :\n{}", indent, ctx, str);
-        delete_string(str);
     }
 }
 
@@ -94,16 +102,15 @@ reset_context :: proc (ctx: ^types.Context, indent: string = "  ") {
 // @param   *ctx*:      The context in question.
 // @param   *indent*:   The depth of the indent for all logs within this function.
 // @return  If there were any errors destroying the context.
-destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.Error {
+destroy_context :: proc (indent: string = "  ") -> types.Error {
     using types;
     using utils;
 
-    assert(ctx != nil, "[ERR]:\t| Error resetting context: Context is nil!");
-
-    if len(ctx.config) > 0 {
-        delete_map(ctx.config);
+    if context.user_ptr == nil {
+        return ContextError.InvalidContext;
     }
 
+    ctx: ^Context = cast(^Context)context.user_ptr;
     level : LogLevel = into_debug(ctx.config["log_level"]);
 
     if level >= LogLevel.Normal {
@@ -111,27 +118,26 @@ destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") -> types.Er
     }
 
     if ctx.root != nil {
-        new_indent , _ := strings.concatenate({ indent, "  " });
-        destroy_node(ctx, ctx.root.id, new_indent);
-        delete_string(new_indent);
-        free(ctx.root);
+        new_indent , _ := strings.concatenate({ indent, "  " }, context.temp_allocator);
+        destroy_node(ctx.root.id, indent = new_indent);
     }
 
     if ctx.renderer != nil {
-        new_indent := strings.concatenate({indent, "  "});
+        new_indent := strings.concatenate({indent, "  "}, context.temp_allocator);
         core.destroy_renderer(ctx.renderer, new_indent);
-        delete_string(new_indent);
     }
 
     if ctx.window != nil {
-        new_indent := strings.concatenate({indent, "  "});
+        new_indent := strings.concatenate({indent, "  "}, context.temp_allocator);
         core.destroy_window(ctx.window, new_indent);
-        delete_string(new_indent);
     }
 
     if level >= LogLevel.Normal {
         fmt.printfln("[INFO]:{}--- Done", indent);
     }
 
+    free_all(ctx.allocator);
+    vmem.arena_destroy(ctx._arena);
+    free(ctx._arena);
     return ContextError.None;
 }

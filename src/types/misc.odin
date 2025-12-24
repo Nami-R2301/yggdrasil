@@ -1,5 +1,8 @@
 package types;
 
+import      "core:os";
+import      "base:runtime";
+
 // Aggregate all errors into this type when a procedure might return multiple types of errors.
 Error :: union {
   ContextError,
@@ -9,7 +12,11 @@ Error :: union {
   ConfigError,
   BufferError,
   ProgramError,
-  ShaderError
+  ShaderError,
+  TextureError,
+  FontError,
+  os.Error,
+  runtime.Allocator_Error
 }
 
 
@@ -17,11 +24,6 @@ Error :: union {
 Option :: union ($T: typeid) {
   T,
   rawptr
-}
-
-Result :: struct ($T: typeid) {
-  error:  Error,
-  opt:    Option(T)
 }
 
 // File types supported for loading UI elements from common web formats.

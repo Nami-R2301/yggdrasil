@@ -1,6 +1,8 @@
 package types;
 
-import "core:container/queue";
+import queue "core:container/queue";
+import vmem  "core:mem/virtual";
+import mem   "core:mem";
 
 // NOTE: The u16 encoding limit for IDs is a deliberate choice, since I deemed this library far too unoptimized to 
 // even fathom having more that 2^16 nodes in a tree at a time. Main bottlenecks here are searching and dispatching
@@ -9,7 +11,7 @@ import "core:container/queue";
 // type aliasing in case this needed to be changed.
 Id :: u16;
 
-Dimension :: [2]u16;
+Dimension :: [2]u32;
 
 // Main data related to a tree used for keeping nodes of data either for rendering to a window or passing it to a vbo.
 //
@@ -17,13 +19,16 @@ Dimension :: [2]u16;
 // the assignment of IDs to your nodes is order sensitive and if you encounter misordering or certain nodes being 
 // prioritized over others, you might have a non-ascending ID causing this.
 Context :: struct {
-  window:                   ^Window,
-  root:                     ^Node,
-  last_node:                ^Node,
-  renderer:                 ^Renderer,
-  node_pairs:               queue.Queue(Node),
-  config:                   map[string]string,
-  cursor:                   Dimension,
+  window:       ^Window,
+  root:         ^Node,
+  last_node:    ^Node,
+  renderer:     ^Renderer,
+  node_pairs:   queue.Queue(Node),
+  config:       map[string]string,
+  cursor:       Dimension,
+  primary_font: Font,
+  _arena:     ^vmem.Arena, // The physical memory manager
+  allocator:  mem.Allocator,  // Allow custom allocators
 }
 
 // Errors regarding the overall app context.
@@ -32,4 +37,5 @@ ContextError :: enum u8 {
   InvalidContext,
   UinitializedContext,
   HeadlessMode,  // When the user tries to create or use a window when they are in headless mode.
+  ArenaAllocFailed  // If our arena can't reserve the 1GB of memory for the ctx for some reason
 }

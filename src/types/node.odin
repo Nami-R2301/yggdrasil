@@ -6,7 +6,7 @@ Node :: struct {
   tag:        string,
   children:   map[Id]Node,
   style:      map[string]Option(string),
-  properties: map[string]Option(string)
+  user_data:  rawptr,
 }
 
 NodeError :: enum u8 {

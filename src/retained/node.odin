@@ -1,9 +1,10 @@
+#+feature dynamic-literals
 package retained;
 
-import fmt "core:fmt";
-import strings "core:strings";
+import fmt      "core:fmt";
+import strings  "core:strings";
 
-import helpers "../";
+import ygg   "../";
 import types "../types";
 import utils "../utils";
 
@@ -27,18 +28,21 @@ import utils "../utils";
 // @param children:     The leaf nodes related under this one,
 // @return              An error if one is encountered and the node created.
 create_node :: proc (
-    ctx:        ^types.Context,
     tag:        string,
     id:         types.Option(int)                   = nil,
     parent:     ^types.Node                         = nil,
     style:      map[string]types.Option(string)     = { },
-    properties: map[string]types.Option(string)     = { },
     children:   map[types.Id]types.Node             = { },
-    indent:     string                              = "  ") -> types.Node {
+    user_data:  rawptr                              = nil,
+    indent:     string                              = "  ") -> (types.Node, types.ContextError) {
     using types;
     using utils;
 
-    assert(ctx != nil, "[ERR]:\t| Error creating node: Context is nil!");
+    if context.user_ptr == nil {
+        return {}, ContextError.InvalidContext;
+    }
+
+    ctx: ^Context = cast(^Context)context.user_ptr;
 
     level : LogLevel = into_debug(ctx.config["log_level"]);
     if level >= LogLevel.Verbose {
@@ -46,9 +50,9 @@ create_node :: proc (
         parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0, parent);
     }
 
-    parent: ^Node = parent != nil ? parent : ctx.last_node;
+    parent_node     := parent != nil ? parent : ctx.last_node;
     new_id: int     = unwrap_or(id, 0);
-    will_overflow  := _check_id_overflow(new_id);
+    will_overflow   := _check_id_overflow(new_id);
 
     if will_overflow && level >= LogLevel.Normal {
         fmt.printfln("[WARN]:{}| Node with ID [{}] will overflow if attached to tree! " +
@@ -56,8 +60,8 @@ create_node :: proc (
         indent, new_id);
     }
 
-    if !is_some(id) && parent != nil {
-        new_id = int(parent.id + Id(len(parent.children) + 1));
+    if !is_some(id) && parent_node != nil {
+        new_id = int(parent_node.id + Id(len(parent_node.children) + 1));
     }
 
     if level >= LogLevel.Verbose {
@@ -65,31 +69,33 @@ create_node :: proc (
     }
 
     return Node {
-        parent = parent,
+        parent = parent_node,
         id = Id(new_id),
         tag = tag,
         children = children,
         style = style,
-        properties = properties
-    };
+        user_data = user_data,
+    }, ContextError.None;
 }
 
 // Deallocate a leaf and all of its children
-destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.NodeError {
+destroy_node :: proc (id: types.Id, indent: string = "  ") -> types.Error {
     using types;
     using utils;
 
-    assert(ctx != nil, "[ERR]:\t| Error destroying node: Context is nil!");
+    if context.user_ptr == nil {
+        return ContextError.InvalidContext;
+    }
 
+    ctx: ^Context = cast(^Context)context.user_ptr;
     level : LogLevel = into_debug(ctx.config["log_level"]);
 
     if level >= LogLevel.Verbose {
         fmt.printfln("[INFO]:{}| Destroying node [{}] ...", indent, id);
     }
 
-    new_indent, _ := strings.concatenate({ indent, "  " });
-    node_ptr := helpers.find_node(ctx, id, new_indent);
-    delete_string(new_indent);
+    new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
+    node_ptr := ygg.find_node(id, new_indent);
 
     if node_ptr == nil {
         if level >= LogLevel.Normal {
@@ -98,11 +104,7 @@ destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") 
         return NodeError.NodeNotFound;
     }
 
-    if node_ptr.parent != nil {
-        node_ptr.parent.children[node_ptr.id] = {};
-    }
-    nodes_to_delete_ordered := helpers.flatten_node(node_ptr);
-    defer delete(nodes_to_delete_ordered);
+    nodes_to_delete_ordered := ygg.flatten_node(node_ptr);
 
     // Reverse the list to get the correct post-order traversal.
     // This ensures we process children before their parents.
@@ -110,7 +112,7 @@ destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") 
         low := 0;
         high := len(nodes_to_delete_ordered) - 1;
         for low < high {
-        // Swap
+            // Swap
             nodes_to_delete_ordered[low],  nodes_to_delete_ordered[high] =
             nodes_to_delete_ordered[high], nodes_to_delete_ordered[low];
             low += 1;
@@ -121,6 +123,14 @@ destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") 
     for node_to_delete in nodes_to_delete_ordered {
         if len(node_to_delete.children) != 0 {
             delete_map(node_to_delete.children);
+        }
+
+        if len(node_to_delete.style) != 0 {
+            delete_map(node_to_delete.style);
+        }
+
+        if node_to_delete.user_data != nil {
+            free(node_to_delete.user_data);
         }
     }
 
@@ -139,12 +149,15 @@ destroy_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") 
 //
 // @param ctx:    The current tree where we want to attach this node to.
 // @param node:   Which node is to be added to the tree
-attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  ") -> types.NodeError {
+attach_node :: proc (node: types.Node, indent: string = "  ") -> types.Error {
     using types;
     using utils;
 
-    assert(ctx != nil, "[ERR]:\t| Error attaching node: Context is nil!");
+    if context.user_ptr == nil {
+        return ContextError.InvalidContext;
+    }
 
+    ctx: ^Context = cast(^Context)context.user_ptr;
     level : LogLevel = into_debug(ctx.config["log_level"]);
 
     parent_ptr : ^Node = node.parent != nil ? node.parent : ctx.last_node;
@@ -156,14 +169,13 @@ attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  
     }
 
     if parent_ptr == nil {
-        ctx.root = new_clone(node);
+        ctx.root = new_clone(node, ctx.allocator);
         new_node   = ctx.root^;
         ctx.last_node = ctx.root;
 
     } else if ctx.last_node != parent_ptr {
-        new_indent, _ := strings.concatenate({ indent, "  " });
-        parent_ptr = helpers.find_node(ctx, parent_ptr.id, new_indent);
-        delete_string(new_indent);
+        new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
+        parent_ptr = ygg.find_node(parent_ptr.id, new_indent);
 
         if parent_ptr == nil {
             if level >= LogLevel.Normal {
@@ -176,8 +188,8 @@ attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  
 
     if parent_ptr != nil && new_node.id == parent_ptr.id {
         fmt.printfln("[WARN]:{}| Overwriting root, setting '{}' as new root ...", indent, node.tag);
-        free(ctx.root);
-        ctx.root = new_clone(new_node);
+        free(ctx.root, ctx.allocator);
+        ctx.root = new_clone(new_node, ctx.allocator);
         ctx.last_node = ctx.root;
     } else {
         new_node.parent = parent_ptr;
@@ -188,10 +200,9 @@ attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  
     }
 
     if level >= LogLevel.Verbose {
+        new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
         if parent_ptr != nil {
-            new_indent, _ := strings.concatenate({ indent, "  " });
-            helpers.print_nodes(parent_ptr, new_indent);
-            delete_string(new_indent);
+            ygg.print_nodes(parent_ptr, new_indent);
         }
 
         fmt.printfln("[INFO]:{}--- Done (%p)", indent, ctx.last_node);
@@ -208,21 +219,24 @@ attach_node :: proc (ctx: ^types.Context, node: types.Node, indent: string = "  
 //
 // @param   *ctx*:    The current tree where we want to attach this node to.
 // @param   *node*:   Which node is to be added to the tree
-detach_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> types.Option(^types.Node) {
+detach_node :: proc (id: types.Id, indent: string = "  ") -> types.Option(^types.Node) {
     using types;
     using utils;
 
-    assert(ctx != nil, "[ERR]:\t| Error detaching node: Context is nil!");
+    if context.user_ptr == nil {
+        return none(^Node);
+    }
+
+    ctx: ^Context = cast(^Context)context.user_ptr;
 
     level : LogLevel = into_debug(ctx.config["log_level"]);
     if level >= LogLevel.Verbose {
         fmt.printfln("[INFO]:{}| Detaching [{}] from context tree ...", indent, id);
     }
 
-    new_indent, _ := strings.concatenate({ indent, "  " });
-    defer delete_string(new_indent);
+    new_indent, _ := strings.concatenate({ indent, "  " }, ctx.allocator);
 
-    node_ptr := helpers.find_node(ctx, id, new_indent);
+    node_ptr := ygg.find_node(id, new_indent);
 
     if node_ptr == nil {
         if level >= LogLevel.Verbose {
@@ -232,11 +246,112 @@ detach_node :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -
         return none(^Node);
     }
 
-    destroy_node(ctx, id, new_indent);
+    destroy_node(id, indent = new_indent);
 
     if level >= LogLevel.Verbose {
         fmt.printfln("[INFO]:{}--- Done", indent);
     }
 
     return node_ptr;
+}
+
+// This function does NOT actually draw contents on the active framebuffer right away, it only compiles it and will
+// be drawn on the next 'render_now()' call.
+text :: proc (str: string, add_to: ^types.Node, indent: string = "  ") -> (text_node: types.Node, err: types.Error) {
+    using types;
+
+    fmt.printfln("[INFO]:{}| Preparing text glyphs for {} ... ", indent, str);
+
+    assert(context.user_ptr != nil, "[ERR]:\tCannot prepare text: Context is nil");
+    ctx := cast(^Context)context.user_ptr;
+
+    box_vertices := cast(^[5]Vertex)add_to.user_data;
+    if box_vertices == nil || size_of(box_vertices) != size_of(^[5]Vertex) {
+        fmt.eprintfln("[ERR]: {}--- Cannot render text {}: Invalid box (add_to)", indent, str);
+        return {}, RendererError.InvalidUserData;
+    }
+
+    new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
+
+    glyphs: [dynamic]Glyph = create_glyphs(str, &ctx.primary_font, 0, 0);
+    ygg.push_data(&ctx.renderer.vbo, Data{ ptr = raw_data(glyphs), count = u64(len(glyphs)), size = size_of(Glyph)},
+    indent = new_indent) or_return;
+
+    text_node = create_node("text", parent = add_to, indent = new_indent) or_return;
+    fmt.printfln("[INFO]:{}--- Done", indent);
+    return text_node, RendererError.None;
+}
+
+// This function does NOT actually draw contents on the active framebuffer right away, it only compiles it and will
+// be drawn on the next 'render_now()' call.
+box :: proc (
+    size_pixels: [2]u32             = {0, 0},
+    offset: types.Option([2]u32)    = nil,  // Optional: Fallback to current cursor position if omitted
+    z: f32                          = 0,
+    color: [4]f32                   = {},
+    roundness: f32                  = 0,
+    indent: string                  = "  ") -> (types.Node, types.Error) {
+    using types;
+    using utils;
+
+    if context.user_ptr == nil {
+        fmt.printfln("[ERR]:{}| Error drawing box: Context is nil!", indent);
+    }
+
+    ctx := cast(^Context)context.user_ptr;
+
+    if ctx.renderer == nil {
+        fmt.eprintfln("[ERR]:{}--- Error drawing box: Renderer is nil!");
+        return {}, RendererError.InvalidRenderer;
+    }
+
+    fmt.printfln("[INFO]:{}| Drawing box ... ", indent);
+    offset: [2]u32 = unwrap_or(offset, ctx.cursor[0]);
+
+    triangle_strip := [5]Vertex{
+    // Top Left (Red)
+        {
+            position     = { f32(offset.x), f32(offset.y), 0.0 },
+            color        = color,
+        },
+        // Bottom Left (Green)
+        {
+            position     = { f32(offset.x), f32(offset.y) + f32(size_pixels[1]), 0.0 },
+            color        = color,
+        },
+        // Bottom Right (Blue)
+        {
+            position     = { f32(offset.x) + f32(size_pixels[0]), f32(offset.y) + f32(size_pixels[1]), 0.0 },
+            color        = color,
+        },
+        // Top Left (Red)
+        {
+            position     = { f32(offset.x), f32(offset.y), 0.0 },
+            color        = color,
+        },
+        // Top Right
+        {
+            position     = { f32(offset.x) + f32(size_pixels[0]), f32(offset.y), 0.0 },
+            color        = color,
+        },
+    }
+
+    new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
+
+    vbo_error  := ygg.prepare_buffer(&ctx.renderer.vbo, Data { ptr = &triangle_strip, count = 5, size = size_of(Vertex) },
+    allocator = ctx.allocator, indent = new_indent);
+    if vbo_error != BufferError.None {
+        fmt.eprintfln("[ERR]:{}--- Error drawing box: {}", vbo_error);
+        return {}, vbo_error;
+    }
+
+    // Advance cursor
+    ctx.cursor[0] += size_pixels[0];
+    ctx.cursor[1] += size_pixels[1];
+
+
+    fmt.printfln("[INFO]:{}--- Done", indent);
+    return create_node("box", style = {
+        "fill_color" = utils.into_str(color),
+    }, user_data = new_clone(triangle_strip, ctx.allocator));
 }

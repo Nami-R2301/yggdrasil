@@ -1,7 +1,7 @@
 package types;
 
 Buffer :: struct {
-    attachments_opt: []u32,
+    attachments_opt: [2]u32,
     count: u64,
     length: u64,
     capacity: u64,
@@ -29,6 +29,12 @@ Vertex :: struct #packed {
     position:   [3]f32,  // x, y, z
     color:      [4]f32,
     tex_coords: [2]f32
+}
+
+Glyph :: struct #packed {
+    entity_id:  i32,
+    x, y, z, w: f32,
+    color:      [4]u32
 }
 
 Data :: struct #packed {

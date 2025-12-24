@@ -4,8 +4,6 @@ package examples;
 // to strip them from the example binary.
 
 main :: proc () {
-//    immediate();
-    retained();
-//    config();
+//    hello_immediate();
+    hello_retained();
 }
-

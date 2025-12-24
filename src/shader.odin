@@ -3,7 +3,6 @@ package ygg;
 import gl "vendor:OpenGL";
 
 import types "types";
-import utils "utils";
 
 load_shaders :: proc (filepaths: []string = {}) -> (u32, types.ShaderError) {
     using types;
@@ -16,13 +15,13 @@ load_shaders :: proc (filepaths: []string = {}) -> (u32, types.ShaderError) {
     return program_id, ShaderError.None;
 }
 
-get_last_program :: proc () -> types.Result(u32) {
+get_last_program :: proc "contextless" () -> (u32, bool) {
     program_id: i32 = 0;
 
     gl.GetIntegerv(gl.CURRENT_PROGRAM, &program_id);
     if program_id <= 0 {
-        return { error = types.ProgramError.ProgramNotFound, opt = utils.none(u32) };
+        return 0, false;
     }
 
-    return { error = types.ProgramError.None, opt = utils.some(u32(program_id)) };
+    return u32(program_id), true;
 }

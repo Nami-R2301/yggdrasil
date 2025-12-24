@@ -6,8 +6,9 @@ import queue "core:container/queue";
 import rt "../retained";
 import types "../types";
 
-begin_frame :: proc (ctx: ^types.Context) {
-    assert(ctx != nil, "[ERR]:\t| Error beginning frame: Context is nil!");
+begin_frame :: proc () {
+    assert(context.user_ptr != nil, "[ERR]:\t| Error beginning frame: Context is nil!");
+    ctx: ^types.Context = cast(^types.Context)context.user_ptr;
 
     queue.init(&ctx.node_pairs);
 
@@ -20,8 +21,10 @@ begin_frame :: proc (ctx: ^types.Context) {
     }
 }
 
-end_frame :: proc (ctx: ^types.Context) {
-    assert(ctx != nil, "[ERR]:\t| Error ending frame: Context is nil!");
+end_frame :: proc () {
+    assert(context.user_ptr != nil, "[ERR]:\t| Error ending frame: Context is nil!");
+    ctx: ^types.Context = cast(^types.Context)context.user_ptr;
+
     assert(queue.len(ctx.node_pairs) == 0, "[ERR]:\t| Error ending frame: One or more nodes are not closed properly - did you add or forget some 'end_nodes(...)'?");
 
     if ctx.window != nil {
@@ -35,12 +38,12 @@ end_frame :: proc (ctx: ^types.Context) {
     // Cleanup queue & tree.
     for queue.len(ctx.node_pairs) > 0 {
         item := queue.pop_back(&ctx.node_pairs);
-        rt.detach_node(ctx, item.id);
+        rt.detach_node(item.id);
     }
     queue.destroy(&ctx.node_pairs);
 
-    rt.detach_node(ctx, ctx.root.id);
-    free(ctx.root);
+    rt.detach_node(ctx.root.id);
+    free(ctx.root, ctx.allocator);
     ctx.root = nil;
     ctx.last_node = nil;
 }

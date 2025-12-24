@@ -5,7 +5,6 @@ import strings "core:strings";
 import glfw "vendor:glfw";
 import c    "core:c";
 import runtime "base:runtime";
-import linalg "core:math/linalg";
 
 import types "types";
 import utils "utils"
@@ -22,10 +21,10 @@ import utils "utils"
 create_window :: proc (
     title:          string,
     profile:        string = "debug",
-    dimensions:     [2]u16 = { 800, 600 },
-    offset:         [2]u16 = { 0, 0 },
+    dimensions:     types.Dimension = { 800, 600 },
+    offset:         types.Dimension = { 0, 0 },
     refresh_rate:   types.Option(u16) = nil,
-    indent:         string = "  ") -> types.Result(types.Window) {
+    indent:         string = "  ") -> (types.Window, types.Error) {
     using types;
     using utils;
 
@@ -33,8 +32,8 @@ create_window :: proc (
     glfw.SetErrorCallback(glfw_error_callback);
 
     if !bool(glfw.Init()) {
-        fmt.eprintfln("[ERR]:{}--- FATAL: Cannot initialize GLFW", indent);
-        return { error = WindowError.InitError, opt = none(types.Window) };
+        fmt.eprintfln("[ERR]: {}--- FATAL: Cannot initialize GLFW", indent);
+        return {}, WindowError.InitError;
     }
     new_window : Window = { };
 
@@ -64,7 +63,7 @@ create_window :: proc (
     new_window.refresh_rate = refresh_rate;
 
     fmt.printfln("[INFO]:{}--- Done", indent);
-    return { error = WindowError.None, opt = utils.some(new_window) };
+    return new_window, WindowError.None;
 }
 
 destroy_window :: proc (window_handle: ^types.Window, indent: string = "  ") -> types.WindowError {
@@ -80,27 +79,19 @@ destroy_window :: proc (window_handle: ^types.Window, indent: string = "  ") -> 
     return types.WindowError.None;
 }
 
-is_window_running :: proc (ctx: ^types.Context) -> bool {
-    if ctx == nil || ctx.window == nil || ctx.window.glfw_handle == nil || utils.into_bool(ctx.config["headless"]) {
+is_window_running :: proc "contextless" (window_ptr: ^types.Window) -> bool {
+    if window_ptr == nil || window_ptr.glfw_handle == nil {
         return false;
     }
 
-    return !bool(glfw.WindowShouldClose(ctx.window.glfw_handle));
+    return !bool(glfw.WindowShouldClose(window_ptr.glfw_handle));
 }
 
 glfw_framebuffer_callback :: proc "c" (window: glfw.WindowHandle, width, height: c.int) {
     context = runtime.default_context();
-    fmt.printfln("[INFO]:  | [Resize] Window resized to {}x{}", width, height);
-    projection_matrix := linalg.matrix_ortho3d(
-        0.0,            // Left
-        f32(width),     // Right
-        f32(height),    // Bottom
-        0.0,            // Top (0 puts origin at top-left)
-        -1.0,           // Near
-        1.0             // Far
-    );
+    fmt.printfln("[INFO]:  | [Resize] Window resized to ({}x{})", width, height);
 
-    update_viewport_and_camera(width, height);
+    update_viewport_and_camera(width, height, "    ");
 }
 
 @(private)

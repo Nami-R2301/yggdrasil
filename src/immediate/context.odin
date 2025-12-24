@@ -23,18 +23,17 @@ import utils "../utils";
 init_context :: proc (
     window_handle:   ^types.Window   = nil,
     renderer_handle: ^types.Renderer = nil,
-    custom_config:   map[string]string = {}) -> types.Result(types.Context) {
+    custom_config:   map[string]string = {}) -> (types.Context, types.Error) {
     using types;
     using utils;
 
     parsed_config := custom_config;
     if len(custom_config) == 0 {
-        result_config := core.sanitize_config();
-        if result_config.error != ConfigError.None {
-            fmt.eprintfln("[ERR]:  --- Error creating context: {}", result_config.error);
-            return { error = result_config.error, opt = none(Context) };
+        parsed_config, error := core.sanitize_config();
+        if error != ConfigError.None {
+            fmt.eprintfln("[ERR]:  --- Error creating context: {}", error);
+            return {}, error
         }
-        parsed_config := unwrap(result_config.opt);
     }
 
     level : LogLevel = into_debug(parsed_config["log_level"]);
@@ -47,24 +46,25 @@ init_context :: proc (
     }
 
     if new_window == nil && !into_bool(parsed_config["headless"]) {
-        result := core.create_window("Yggdrasil (Debug)");
-        if result.error != WindowError.None || !is_some(result.opt) {
-            return { error = result.error, opt = none(Context) };
+        window, error := core.create_window("Yggdrasil (Debug)");
+        if error != WindowError.None {
+            return {}, error;
         }
 
-        new_window = new_clone(unwrap(result.opt));
+        new_window = new_clone(window);
     }
 
-    if new_window != nil && new_renderer == nil && into_bool(parsed_config["renderer"]) {
+    if new_window != nil && new_renderer == nil {
         if level >= LogLevel.Verbose {
             fmt.printfln("[WARN]:  --- No renderer handle found, creating one ...");
         }
-        result_renderer := core.create_renderer();
-        if result_renderer.error != RendererError.None {
-            return { error = RendererError.InitError, opt = none(Context) };
+        renderer, error := core.create_renderer(new_window);
+        if error != RendererError.None {
+            fmt.eprintfln("[ERR]:  --- Error creating context: Renderer error: {}", error);
+            return {}, error;
         }
 
-        new_renderer = new_clone(unwrap(result_renderer.opt));
+        new_renderer = new_clone(renderer);
     }
     return rt.create_context(new_window, new_renderer, config = parsed_config);
 }
@@ -78,9 +78,14 @@ init_context :: proc (
 //                  about memory footprint as long as the context is valid.
 // @param   *ctx*: Context to free and terminate.
 // @return  An error if one occurred.
-terminate_context :: proc (ctx: ^types.Context) -> types.Error {
-    error := rt.destroy_context(ctx);
+terminate_context :: proc () -> types.Error {
+    error := rt.destroy_context();
 
+    if context.user_ptr == nil {
+        return types.ContextError.InvalidContext;
+    }
+
+    ctx: ^types.Context = cast(^types.Context)context.user_ptr;
     if ctx.window != nil {
         free(ctx.window);
     }

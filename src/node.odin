@@ -1,6 +1,7 @@
 package ygg;
 
 import fmt "core:fmt";
+import mem "core:mem";
 
 import types "types";
 import utils "utils";
@@ -18,24 +19,27 @@ find_node :: proc {
 // @param   id:     The node ID you are looking for.
 // @param   indent: The level of indent for all logs inside this function, open for fine-tuning.
 // @return  Nil if the node was not found, the pointer to the node within the tree otherwise.
-find_node_with_id :: proc (ctx: ^types.Context, id: types.Id, indent: string = "  ") -> ^types.Node {
-    assert(ctx != nil, "[ERR]:\t| Error finding node: Context is nil!");
+find_node_with_id :: proc (id: types.Id, indent: string = "  ") -> ^types.Node {
+    using types;
+
+    assert(context.user_ptr != nil, "[ERR]:\t| Error finding node: Context is nil!");
+    ctx: ^Context = cast(^Context)context.user_ptr;
 
     log_level := utils.into_debug(ctx.config["log_level"]);
 
-    if log_level >= types.LogLevel.Verbose {
+    if log_level >= LogLevel.Verbose {
         fmt.printf("[INFO]:{}| Searching for node id [{}] in context tree ...", indent, id);
     }
 
     if ctx.root == nil {
-        if log_level >= types.LogLevel.Verbose {
+        if log_level >= LogLevel.Verbose {
             fmt.println(" Done");
         }
         return ctx.root;
     }
 
     if id == ctx.root.id {
-        if log_level >= types.LogLevel.Verbose {
+        if log_level >= LogLevel.Verbose {
             fmt.println(" Done");
         }
 
@@ -45,37 +49,40 @@ find_node_with_id :: proc (ctx: ^types.Context, id: types.Id, indent: string = "
     node_ptr := flatten_and_find_node(ctx.root, id = id);
 
     if node_ptr != nil && node_ptr.id == id {
-        if log_level >= types.LogLevel.Verbose {
+        if log_level >= LogLevel.Verbose {
             fmt.println(" Done");
         }
         return node_ptr;
     }
 
-    if log_level >= types.LogLevel.Verbose {
+    if log_level >= LogLevel.Verbose {
         fmt.printfln("\n[WARN]:{}--- Node not found", indent);
     }
 
     return nil;
 }
 
-find_node_with_tag :: proc (ctx: ^types.Context, tag: string, indent: string = "  ") -> ^types.Node {
-    assert(ctx != nil, "[ERR]:\t| Error finding node: Context is nil!");
+find_node_with_tag :: proc (tag: string, indent: string = "  ") -> ^types.Node {
+    using types;
+
+    assert(context.user_ptr != nil, "[ERR]:\t| Error finding node: Context is nil!");
+    ctx: ^Context = cast(^Context)context.user_ptr;
 
     log_level := utils.into_debug(ctx.config["log_level"]);
 
-    if log_level >= types.LogLevel.Verbose {
+    if log_level >= LogLevel.Verbose {
         fmt.printf("[INFO]:{}| Searching for node id '{}' in context tree ...", indent, tag);
     }
 
     if ctx.root == nil {
-        if log_level >= types.LogLevel.Verbose {
+        if log_level >= LogLevel.Verbose {
             fmt.println(" Done");
         }
         return ctx.root;
     }
 
     if tag == ctx.root.tag {
-        if log_level >= types.LogLevel.Verbose {
+        if log_level >= LogLevel.Verbose {
             fmt.println(" Done");
         }
 
@@ -85,13 +92,13 @@ find_node_with_tag :: proc (ctx: ^types.Context, tag: string, indent: string = "
     node_ptr := flatten_and_find_node(ctx.root, tag = tag);
 
     if node_ptr != nil && node_ptr.tag == tag {
-        if log_level >= types.LogLevel.Verbose {
+        if log_level >= LogLevel.Verbose {
             fmt.println(" Done");
         }
         return node_ptr;
     }
 
-    if log_level >= types.LogLevel.Verbose {
+    if log_level >= LogLevel.Verbose {
         fmt.printfln("\n[WARN]:{}--- Node not found", indent);
     }
 
@@ -110,11 +117,14 @@ get_node_depth :: proc (root: ^types.Node) -> types.Id {
         return 0;
     }
 
-    flat_nodes := flatten_node(root);
-    defer delete_dynamic_array(flat_nodes);
+    if context.user_ptr == nil {
+        return 0;
+    }
 
-    different_ids := make(map[^Node]bool);
-    defer delete_map(different_ids);
+    ctx := cast(^Context)context.user_ptr;
+
+    flat_nodes := flatten_node(root);
+    different_ids := make(map[^Node]bool, context.temp_allocator);
 
     for node in flat_nodes {
         if node != nil && node != root {
@@ -133,17 +143,17 @@ get_node_depth :: proc (root: ^types.Node) -> types.Id {
 // @param   *node_ptr*:     Which node to flatten with its children.
 // @param   *stop_at*:      An ID that will stop the flattening process to act as an end bound.
 // @return  The flattened list containing the node provided and all of its children.
-flatten_node :: proc (start_ptr: ^types.Node, stop_at: types.Option(types.Id) = nil) -> [dynamic]^types.Node {
+flatten_node :: proc (start_ptr: ^types.Node, stop_at: types.Option(types.Id) = nil, allocator: mem.Allocator = context.temp_allocator) -> [dynamic]^types.Node {
     using types;
     using utils;
 
-    end_bound: Id = unwrap_or(stop_at, Id(_get_max_number(Id)))
+    end_bound: Id = unwrap_or(stop_at, Id(_get_max_number(Id)));
+
     // Stack for DFS traversal, implemented with a dynamic array.
-    to_visit := make([dynamic]^Node);
-    defer delete(to_visit);
+    to_visit := make([dynamic]^Node, allocator);
 
     // Flatten map to store the nodes in post-order (children first).
-    flat_nodes := make([dynamic]^Node);
+    flat_nodes := make([dynamic]^Node, allocator);
 
     append(&to_visit, start_ptr);
 
@@ -173,26 +183,29 @@ flatten_and_find_node :: proc {
 flatten_and_find_node_with_id :: proc (start_ptr: ^types.Node, id: types.Id) -> ^types.Node {
     using types;
 
+    if context.user_ptr == nil {
+        return nil;
+    }
+
+    ctx := cast(^Context)context.user_ptr;
+
     // Stack for DFS traversal, implemented with a dynamic array.
-    to_visit := make([dynamic]^Node);
-    defer delete(to_visit);
+    to_visit := make([dynamic]^Node, context.temp_allocator);
 
     // Flatten map to store the nodes in post-order (children first).
-    flat_nodes := make([dynamic]^Node);
-    defer delete_dynamic_array(flat_nodes);
-
-    append(&to_visit, start_ptr);
+    flat_nodes := make([dynamic]^Node, context.temp_allocator);
+    append_elem(&to_visit, start_ptr);
 
     // Dynamically grow the flat list of nodes, and only stop when all inner nodes have been explored.
     for len(to_visit) > 0 {
         node := pop(&to_visit);
-        append(&flat_nodes, node);
+        append_elem(&flat_nodes, node);
         if id == node.id {
             return node;
         }
 
         for _, &child in node.children {
-            append(&to_visit, &child);
+            append_elem(&to_visit, &child);
         }
     }
 
@@ -207,14 +220,17 @@ flatten_and_find_node_with_id :: proc (start_ptr: ^types.Node, id: types.Id) -> 
 flatten_and_find_node_with_tag :: proc (start_ptr: ^types.Node, tag: string) -> ^types.Node {
     using types;
 
+    if context.user_ptr == nil {
+        return nil;
+    }
+
+    ctx := cast(^Context)context.user_ptr;
+
     // Stack for DFS traversal, implemented with a dynamic array.
-    to_visit := make([dynamic]^Node);
-    defer delete(to_visit);
+    to_visit := make([dynamic]^Node, context.temp_allocator);
 
     // Flatten map to store the nodes in post-order (children first).
-    flat_nodes := make([dynamic]^Node);
-    defer delete_dynamic_array(flat_nodes);
-
+    flat_nodes := make([dynamic]^Node, context.temp_allocator);
     append(&to_visit, start_ptr);
 
     // Dynamically grow the flat list of nodes, and only stop when all inner nodes have been explored.

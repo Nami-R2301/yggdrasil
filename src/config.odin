@@ -1,7 +1,12 @@
 package ygg;
 
+import fmt      "core:fmt";
+import os       "core:os";
+import ttf      "vendor:stb/truetype";
+import runtime  "base:runtime";
+
 import types "types";
-import utils "utils"
+import utils "utils";
 
 // Core API to sanitize a config file and auto-generate default values for any option missing or set
 // to none.
@@ -11,23 +16,25 @@ import utils "utils"
 //                    config is provided.
 // @param   *indent*: The depth of the indent for all logs within this function.
 // @return  A sanitized version of the config provided as input.
-sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(string)) = nil, indent: string = "  ") -> types.Result(map[string]string) {
-    new_config := utils.default_config();
-    config_read: map[string]types.Option(string) = {};
-    if !utils.is_some(config_opt) {
+sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(string)) = nil, indent: string = "  ") -> (map[string]string, types.Error) {
+    using types;
+    using utils;
+
+    new_config := default_config();
+    config_read: map[string]Option(string) = {};
+    if !is_some(config_opt) {
         // Attempt to read from toml file.
-        result_config := read_config();
-        if result_config.error != types.ConfigError.None {
-            return { error = result_config.error, opt = utils.none(map[string]string) };
+        config_read, error := read_config();
+        if error != ConfigError.None {
+            return {}, error;
         }
-        config_read = utils.unwrap(result_config.opt);
     }
 
     for key, value_opt in config_read {
-        if utils.is_some(value_opt) {
-            value := utils.unwrap(value_opt);
+        if is_some(value_opt) {
+            value := unwrap(value_opt);
             switch key {
-                case "log_level":   new_config[key] = utils.into_str(utils.into_debug(value));
+                case "log_level":   new_config[key] = into_str(into_debug(value));
                 case "log_file":
                     switch value {
                         case "":    new_config[key] = "n/a";
@@ -47,14 +54,14 @@ sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(string
                     }
                 }
                 case "cache": {
-                    new_config[key] = utils.into_str(utils.into_bool(value));
+                    new_config[key] = into_str(into_bool(value));
                 }
                 case "headless":
-                    new_config[key] = utils.into_str(utils.into_bool(value));
+                    new_config[key] = into_str(into_bool(value));
                 }
         }
     }
-    return { error = types.ConfigError.None, opt = utils.some(new_config) };
+    return new_config, ConfigError.None;
 }
 
 // Core API to attempt to read the yggdrasil config toml file and return its options with a key-value
@@ -65,6 +72,37 @@ sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(string
 // @return  An error if one occurred and an optional map of key-value pairs corresponding to features
 //          and options available for configuring the context if no errors occurred.
 // TODO: Read from file.
-read_config :: proc (indent: string = "  ") ->  types.Result(map[string]types.Option(string)) {
+read_config :: proc (indent: string = "  ") ->  (map[string]types.Option(string), types.Error) {
     panic("Unimplemented");
+}
+
+// Returns the width and height of the string in pixels
+measure_string :: proc(info: ^ttf.fontinfo, text: string, font_size: f32) -> (width: f32, height: f32) {
+    // 1. Calculate the scale factor for the desired pixel height
+    scale := ttf.ScaleForPixelHeight(info, font_size)
+
+    // 2. Calculate Height (Ascent - Descent)
+    ascent, descent, line_gap: i32
+    ttf.GetFontVMetrics(info, &ascent, &descent, &line_gap)
+    height = f32(ascent - descent) * scale
+
+    // 3. Calculate Width (Sum of advances + kerning)
+    width = 0
+    last_codepoint: rune = -1
+
+    for r in text {
+        advance, lsb: i32
+        ttf.GetCodepointHMetrics(info, r, &advance, &lsb)
+
+        // Add kerning (adjustment between specific pairs, e.g., 'A' and 'V')
+        if last_codepoint != -1 {
+            kern := ttf.GetCodepointKernAdvance(info, last_codepoint, r)
+            width += f32(kern) * scale
+        }
+
+        width += f32(advance) * scale
+        last_codepoint = r
+    }
+
+    return
 }

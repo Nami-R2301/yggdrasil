@@ -35,6 +35,7 @@ RendererError :: enum u8 {
   InitError,
   APIError,
   UnsupportedVersion,
+  InvalidUserData
 }
 
 AsyncErrorMessage :: struct {
