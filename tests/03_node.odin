@@ -30,9 +30,8 @@ setup :: proc (t: ^testing.T) -> types.Context {
   }
   context.user_ptr = &ctx;  // Temp
 
-  node, error := rt.create_node("root");
-  node_err    := rt.attach_node(node);
-  assert(node_err == NodeError.None, "Error attaching root node");
+  node := rt.create_node("root");
+  rt.attach_node(node);
   return ctx;
 }
 
@@ -44,23 +43,13 @@ create_duplicate :: proc (t: ^testing.T) {
   ctx := setup(t);
   context.user_ptr = &ctx;
 
-  defer {
-    error := rt.destroy_context();
-    assert(error == types.ContextError.None, "Error during test cleanup");
-  }
+  defer rt.destroy_context(&ctx);
 
-  first,  err1  := rt.create_node("head", utils.some(1));
-  testing.expect(t, err1 == ContextError.None, "Error creating node");
+  first  := rt.create_node("head", utils.some(1));
+  second := rt.create_node("head2", utils.some(1));
 
-  second, err2  := rt.create_node("head2", utils.some(1));
-  testing.expect(t, err1 == ContextError.None, "Error creating node");
-
-
-  err := rt.attach_node(first);
-  testing.expect(t, err == NodeError.None, "Error attaching first node");
-
-  err  = rt.attach_node(second);
-  testing.expect(t, err == NodeError.None, "Error attaching second node");
+  rt.attach_node(first);
+  rt.attach_node(second);
 }
 
 @(test)
@@ -71,31 +60,18 @@ find_node :: proc (t: ^testing.T) {
   ctx := setup(t);
   context.user_ptr = &ctx;
 
-  defer {
-    error := rt.destroy_context();
-    assert(error == types.ContextError.None, "Error during test cleanup");
-  }
+  defer rt.destroy_context(&ctx);
   
-  head_node, err1  := rt.create_node("head");
-  testing.expect(t, err1 == ContextError.None, "Error creating node");
-
-  link_node, err2  := rt.create_node("link", parent = &head_node);
-  testing.expect(t, err2 == ContextError.None, "Error creating node");
-
-  a_node,    err3  := rt.create_node("a", parent = &link_node);
-  testing.expect(t, err1 == ContextError.None, "Error creating node");
+  head_node := rt.create_node("head");
+  link_node := rt.create_node("link", parent = &head_node);
+  a_node    := rt.create_node("a", parent = &link_node);
 
   node_ptr := ygg.find_node(2);
   testing.expect(t, node_ptr == nil, "A tag should not be found, since it is not attached to the tree");
 
-  err := rt.attach_node(head_node);
-  testing.expect(t, err == NodeError.None, "Error attaching <head> node");
-
-  err  = rt.attach_node(link_node);
-  testing.expect(t, err == NodeError.None, "Error attaching <link> node");
-
-  err  = rt.attach_node(a_node);
-  testing.expect(t, err == NodeError.None, "Error attaching <a> node");
+  rt.attach_node(head_node);
+  rt.attach_node(link_node);
+  rt.attach_node(a_node);
 }
 
 @(test)
@@ -106,20 +82,14 @@ max_depth :: proc (t: ^testing.T) {
   ctx := setup(t);
   context.user_ptr = &ctx;
 
-  defer {
-    error := rt.destroy_context();
-    assert(error == types.ContextError.None, "Error during test cleanup");
-  }
+  defer rt.destroy_context(&ctx);
 
   max_node_depth: Id = Id(_get_max_number(Id));
   lvl_1: u16 = (max_node_depth / 16) + 1;
 
   for _ in 0..=lvl_1 - 1 {
-    node, err1  := rt.create_node("head");
-    testing.expect(t, err1 == ContextError.None, "Error creating node");
-
-    error      := rt.attach_node(node);
-    testing.expect_value(t, error, NodeError.None);
+    node := rt.create_node("head");
+    rt.attach_node(node);
   }
 
   testing.expect_value(t, ygg.get_node_depth(ctx.root), lvl_1);
@@ -128,11 +98,8 @@ max_depth :: proc (t: ^testing.T) {
 
 
   for _ in lvl_1..=lvl_2 - 1 {
-    node, err1  := rt.create_node("head");
-    testing.expect(t, err1 == ContextError.None, "Error creating node");
-
-    error      := rt.attach_node(node);
-    testing.expect_value(t, error, NodeError.None);
+    node  := rt.create_node("head");
+    rt.attach_node(node);
   }
 
   testing.expect_value(t, ygg.get_node_depth(ctx.root), lvl_2);
@@ -141,11 +108,8 @@ max_depth :: proc (t: ^testing.T) {
 
 
   for _ in lvl_2..=lvl_3 - 1 {
-    node, err1  := rt.create_node("head");
-    testing.expect(t, err1 == ContextError.None, "Error creating node");
-
-    error := rt.attach_node(node);
-    testing.expect(t, error == NodeError.None, "Error attaching node");
+    node := rt.create_node("head");
+    rt.attach_node(node);
   }
 
   testing.expect_value(t, ygg.get_node_depth(ctx.root), lvl_3);
@@ -158,25 +122,18 @@ id_overflow :: proc (t: ^testing.T) {
   ctx := setup(t);
   context.user_ptr = &ctx;
 
-  defer {
-    error := rt.destroy_context();
-    assert(error == types.ContextError.None, "Error during test cleanup");
-  }
+  defer rt.destroy_context(&ctx);
 
-  head,  err1  := rt.create_node(tag = "head", id = utils.some(65_536));
-  testing.expect(t, err1 == ContextError.None, "Error creating node");
-
-  title, err2  := rt.create_node(tag = "title", parent = &head);
-  testing.expect(t, err2 == ContextError.None, "Error creating node");
-
-  link,  err3  := rt.create_node(tag = "link", parent = &head);
-  testing.expect(t, err3 == ContextError.None, "Error creating node");
+  head  := rt.create_node(tag = "head", id = utils.some(65_536));
+  title := rt.create_node(tag = "title", parent = &head);
+  link  := rt.create_node(tag = "link", parent = &head);
 
   testing.expect(t, head.id == 0, "Expected node id to overflow back to 0");
 
-  err := rt.attach_node(head);
-  err  = rt.attach_node(title);
-  err  = rt.attach_node(link);
+  rt.attach_node(head);
+  rt.attach_node(title);
+  rt.attach_node(link);
+
   testing.expect(t, ctx.root.tag == "head", "Expected head to now be root due to overflow");
   testing.expect_value(t, ygg.get_node_depth(ctx.root), 1);
 }

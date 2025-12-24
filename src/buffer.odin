@@ -13,7 +13,7 @@ C_VBO_SIZE_LIMIT : u64 = 10_000_000;
 create_framebuffer :: proc(fbo_width: u32, fbo_height: u32, indent: string = "  ") -> types.Buffer {
     using types;
 
-    fmt.printf("[INFO]:{}| Creating framebuffer ... ", indent);
+    fmt.printf("[INFO]:{}| Creating Framebuffer ... ", indent);
     textures : [2]u32 = { 0, 0 };
 
     gl.GenTextures(2, &textures[0]);
@@ -63,7 +63,7 @@ create_buffer :: proc (
         capacity = capacity,
     };
 
-    fmt.printf("\n[INFO]:{}| Creating buffer of type '{}' and capacity of '{}' ... ", indent, buffer_type, capacity);
+    fmt.printf("[INFO]:{}| Creating buffer of type '{}' and capacity of '{}' ... ", indent, buffer_type, capacity);
 
     if buffer.capacity > C_VBO_SIZE_LIMIT {
         fmt.eprintfln("[ERR]:{}--- Buffer capacity '{}' for ('{}') exceeds the maximum allowed bytes ({})", indent,
@@ -84,7 +84,7 @@ create_buffer :: proc (
         panic("Unimplemented");
     }
 
-    fmt.print("Done");
+    fmt.println("Done");
     return buffer, BufferError.None;
 }
 
@@ -114,12 +114,10 @@ reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> types.Buf
 prepare_buffer :: proc (
     buffer:         ^types.Buffer,
     opt_data:       types.Data = { },
-    allocator:      mem.Allocator = context.allocator,
     indent:         string = "  ") -> types.BufferError {
     using types;
 
-    inner_indent := strings.concatenate({ indent, "        " }, allocator);
-    fmt.printfln("[INFO]:{}| Preparing buffer ({}) ... ", indent, utils.into_str(buffer, inner_indent));
+    fmt.printf("[INFO]:{}| Preparing {} ... ", indent, buffer.type);
 
     switch buffer.type {
     case BufferType.Framebuffer:
@@ -146,7 +144,7 @@ prepare_buffer :: proc (
     }
 
     if opt_data.ptr != nil {
-        new_indent := strings.concatenate({ indent, "  " }, allocator);
+        new_indent := strings.concatenate({ indent, "  " }, context.temp_allocator);
 
         if err := push_data(buffer, opt_data, indent = new_indent); err != BufferError.None {
             restore_last_buffer_state(buffer);
@@ -156,7 +154,8 @@ prepare_buffer :: proc (
 
     restore_last_buffer_state(buffer);
 
-    fmt.printfln("[INFO]:{}--- Done", indent);
+
+    fmt.println("Done");
     return BufferError.None;
 }
 
@@ -167,11 +166,11 @@ grow_buffer :: proc (
     using types;
 
 
-    fmt.printfln("[INFO]:{}| Growing buffer '{}' ({}) from {} bytes to {} ... ", indent, buffer.id, buffer.type, buffer.capacity,
+    fmt.printf("[INFO]:{}| Growing buffer '{}' ({}) from {} bytes to {} ... ", indent, buffer.id, buffer.type, buffer.capacity,
     buffer.capacity + size_bytes);
 
     buffer.capacity += size_bytes;
-    fmt.printfln("[INFO]:{}--- Done", indent);
+    fmt.printfln("Done");
     return BufferError.None;
 }
 
@@ -203,7 +202,7 @@ migrate_buffer :: proc (
     indent:             string = "  ") -> (types.Buffer, types.Error) {
     using types;
 
-    fmt.printfln("[INFO]:{}| Migrating buffer {} ({}) into a new buffer", indent, buffer.id, buffer.type);
+    fmt.printfln("[INFO]:{}| Migrating buffer {} ({}) into a new buffer ... ", indent, buffer.id, buffer.type);
 
     if new_size_bytes == buffer.capacity {
         fmt.printfln("[ERR]:{}--- Cannot migrate buffer {}: Original buffer size is the same as new one, skipping migration",
@@ -232,14 +231,18 @@ push_data :: proc (
     indent:           string = "  ") -> types.BufferError {
     using types;
 
+    original_size := buffer.capacity;
     from_where := utils.unwrap_or(from_where_bytes, buffer.length);
     size_bytes := data.count * data.size;
     fmt.printf("[INFO]:{}| [{}] Appending data (count = {}, size = %2d) at {}/{} ... ", indent,
-    buffer.type, data.count, data.size, from_where, buffer.capacity);
+    buffer.type, data.count, data.size, from_where, original_size);
 
-    if buffer.length + size_bytes > buffer.capacity {
+    if from_where + size_bytes > original_size {
         fmt.printfln("\n[WARN]:{}--- Data too big ({}) for buffer's capacity ({}), growing it ...", indent, size_bytes, buffer.capacity);
-        if err := grow_buffer(buffer, size_bytes); err != BufferError.None {
+        new_indent, err := strings.concatenate({indent, "  "}, context.temp_allocator);
+        assert(err == mem.Allocator_Error.None, "[ERR]:\tCannot push data: Out of memory (buy more ram)");
+
+        if err := grow_buffer(buffer, size_bytes, new_indent); err != BufferError.None {
             return err;
         }
     }
@@ -250,7 +253,12 @@ push_data :: proc (
 
     buffer.length += size_bytes;
     buffer.count += data.count;
-    fmt.printfln("Done ({}/{})", buffer.length, buffer.capacity);
+
+    if original_size != buffer.capacity {
+        fmt.printfln("[INFO]:{}--- Done ({}/{})", indent, buffer.length, buffer.capacity);
+    } else {
+        fmt.printfln("Done ({}/{})", buffer.length, buffer.capacity);
+    }
     return BufferError.None;
 }
 
@@ -284,8 +292,67 @@ pop_data :: proc (
     return Data{ ptr = get_data, count = count, size = size_bytes }, BufferError.None;
 }
 
-// TODO: Pack node styling and properties into appropriate uniforms and vertex data to pass to shader later on.
-serialize_nodes :: proc (root: ^types.Node, indent: string = "  ") -> ([]byte, types.Error) {
+push_text :: proc (text: ^types.Node, indent: string = "  ") -> types.Error {
+    using types;
+
+    assert(context.user_ptr != nil, "[ERR]:\tCannot push text: Context is nil. Did you forget to call 'create_context' " +
+    "or to set context.user_ptr to '&ctx' ?");
+    ctx := cast(^Context)context.user_ptr;
+    if ctx == nil || ctx.renderer == nil {
+        fmt.eprintfln("[ERR]:{} --- Cannot push text: No renderer found or is nil. Did you forget to call 'create_renderer' ?",
+        indent);
+        return BufferError.InvalidRenderer;
+    }
+
+    data: ^Data = cast(^Data)text.user_data;
+    if data == nil {
+        fmt.printfln("[WARN]:{}--- Cannot push text: No data found in text node, skipping ...");
+        return BufferError.InvalidPtr;
+    }
+
+    if err := push_data(&ctx.renderer.vbo, data^, indent = indent); err != nil {
+        fmt.eprintfln("[ERR]:{} --- Cannot push text: {}", indent, err);
+        return err;
+    }
+
+    // TODO: Pack node styling and properties into appropriate uniforms and vertex data to pass to shader later on.
+
+    return BufferError.None;
+}
+
+push_box :: proc (box: ^types.Node, indent: string = "  ") -> types.Error {
+    using types;
+
+    assert(context.user_ptr != nil, "[ERR]:\tCannot push box: Context is nil. Did you forget to call 'create_context' " +
+    "or to set context.user_ptr to '&ctx' ?");
+    ctx := cast(^Context)context.user_ptr;
+    if ctx == nil || ctx.renderer == nil {
+        fmt.eprintfln("[ERR]:{} --- Cannot push box: No renderer found or is nil. Did you forget to call 'create_renderer' ?",
+            indent);
+        return BufferError.InvalidRenderer;
+    }
+
+    data: ^Data = cast(^Data)box.user_data;
+    if data == nil {
+        fmt.printfln("[WARN]:{}--- Cannot push text: No data found in text node, skipping ...");
+        return BufferError.InvalidPtr;
+    }
+
+    if err := push_data(&ctx.renderer.vbo, data^, indent = indent); err != nil {
+        fmt.eprintfln("[ERR]:{} --- Cannot push text: {}", indent, err);
+        return err;
+    }
+
+    // TODO: Pack node styling and properties into appropriate uniforms and vertex data to pass to shader later on.
+
+    return BufferError.None;
+}
+
+push_img :: proc (img: ^types.Node, indent: string = "  ") -> types.Error {
+    panic("Unimplemented");
+}
+
+push_node :: proc (custom_node: ^types.Node, indent: string = "  ") -> types.Error {
     panic("Unimplemented");
 }
 

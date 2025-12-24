@@ -8,18 +8,24 @@ import glfw    "vendor:glfw";
 import runtime "base:runtime";
 import linalg  "core:math/linalg";
 
-import types   "types";
+import types   "types"
+import strings "core:strings"
+import mem "core:mem";
 
-create_renderer :: proc (window: ^types.Window, indent: string = "  ") -> (types.Renderer, types.Error) {
+create_renderer :: proc (
+    window:                 ^types.Window,
+    desired_major_version:  int = 4,
+    desired_minor_version:  int = 3,
+    indent:                 string = "  ") -> types.Renderer {
     using types;
 
     assert(window != nil, "[ERR]:\tError creating renderer: Window is nil!");
 
-    fmt.printfln("[INFO]:{}| Creating renderer ... ", indent);
+    fmt.printfln("[INFO]:{}| Creating renderer (OpenGL {}.{} bindings) ... ",
+        indent, desired_major_version, desired_minor_version);
 
     // Load GL functions.
-    gl.load_up_to(4, 3, glfw.gl_set_proc_address);
-    fmt.printfln("[INFO]:{}  --- Loaded GL bindings up to 4.3", indent);
+    gl.load_up_to(desired_major_version, desired_minor_version, glfw.gl_set_proc_address);
 
     // Enable async error handling for OpenGL calls.
     gl.Enable(gl.DEBUG_OUTPUT);
@@ -28,11 +34,15 @@ create_renderer :: proc (window: ^types.Window, indent: string = "  ") -> (types
     gl.DebugMessageControl(gl.DONT_CARE, gl.DEBUG_TYPE_OTHER, gl.DONT_CARE, 0, nil, gl.FALSE);
 
     // Init buffers
+    new_indent, err := strings.concatenate({indent, "  "});
+    assert(err == mem.Allocator_Error.None, "[ERR]:\tCannot create renderer: Out of memory (buy more ram)");
+
     buffer_vao, buffer_vbo := _create_initial_buffers();
+    vbo_error := prepare_buffer(&buffer_vbo, indent = new_indent);
 
     // Create UI Layer
-    fbo        := create_framebuffer(window.dimensions[0], window.dimensions[1]);
-    fbo_error  := prepare_buffer(&fbo);
+    fbo        := create_framebuffer(window.dimensions[0], window.dimensions[1], indent = new_indent);
+    fbo_error  := prepare_buffer(&fbo, indent = new_indent);
     assert(fbo_error == BufferError.None, "[ERR]:\tError preparing Framebuffer");
 
     renderer : Renderer = {
@@ -50,7 +60,7 @@ create_renderer :: proc (window: ^types.Window, indent: string = "  ") -> (types
     }
 
     renderer.program = program_id;
-    return renderer, RendererError.None;
+    return renderer;
 }
 
 destroy_renderer :: proc (renderer_ptr: ^types.Renderer, indent: string = "  ") -> types.RendererError {
@@ -162,14 +172,14 @@ gl_asynchronous_error_callback :: proc "c" (
 }
 
 @(private)
-_create_initial_buffers :: proc "contextless" () -> (types.Buffer, types.Buffer) {
+_create_initial_buffers :: proc (indent: string = "  ") -> (types.Buffer, types.Buffer) {
     using types;
 
-    vao : u32 = 0;
-    vbo : u32 = 0;
+    new_indent, err := strings.concatenate({indent, "  "});
+    assert(err == mem.Allocator_Error.None, "[ERR]:\tCannot create renderer: Out of memory (buy more ram)");
 
-    gl.GenVertexArrays(1, &vao);
-    gl.GenBuffers(1, &vbo);
+    vao_buffer, _ := create_buffer(BufferType.Vao, capacity = 1, indent = new_indent);
+    vbo_buffer, _ := create_buffer(BufferType.Vbo, indent = new_indent);
 
     last_vao_bound : i32 = 0;
     last_vbo_bound : i32 = 0;
@@ -177,8 +187,8 @@ _create_initial_buffers :: proc "contextless" () -> (types.Buffer, types.Buffer)
     gl.GetIntegerv(gl.VERTEX_ARRAY_BINDING, &last_vao_bound);
     gl.GetIntegerv(gl.ARRAY_BUFFER_BINDING, &last_vbo_bound);
 
-    gl.BindVertexArray(vao);
-    gl.BindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.BindVertexArray(vao_buffer.id);
+    gl.BindBuffer(gl.ARRAY_BUFFER, vbo_buffer.id);
 
     // i32 + vec3 + vec4 + vec2
     stride: i32 = size_of(i32) + (3 * size_of(f32)) + (4 * size_of(f32)) + (2 * size_of(f32));
@@ -208,18 +218,5 @@ _create_initial_buffers :: proc "contextless" () -> (types.Buffer, types.Buffer)
     gl.BindVertexArray(u32(last_vao_bound));
     gl.BindBuffer(gl.ARRAY_BUFFER, u32(last_vbo_bound));
 
-    buffer_vao := Buffer {
-        id          = vao,
-        type        = BufferType.Vao,
-        capacity    = 1,
-        count       = 0,
-    };
-    buffer_vbo := Buffer {
-        id          = vbo,
-        type        = BufferType.Vbo,
-        capacity    = 1_000_000,
-        count       = 0,
-    };
-
-    return buffer_vao, buffer_vbo;
+    return vao_buffer, vbo_buffer;
 }

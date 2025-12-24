@@ -18,23 +18,14 @@ begin_node :: proc (
     assert(context.user_ptr != nil, "[ERR]:\t| Error creating node: Context is nil!");
     ctx: ^Context = cast(^Context)context.user_ptr;
 
-    node, error := rt.create_node(tag = tag, style = style);
-
-    if error != ContextError.None {
-        return node, error;
-    }
+    node := rt.create_node(tag = tag, style = style);
 
     if queue.len(ctx.node_pairs) > 0 {
         node.parent = queue.back_ptr(&ctx.node_pairs);
     }
 
     new_indent := strings.concatenate({indent, "  "}, context.temp_allocator);
-    node_error := rt.attach_node(node, indent = indent);
-
-    if node_error != NodeError.None {
-        fmt.printfln("[ERR]:{}--- Error beginning node '{}': Cannot attach node -> {}", indent, tag, node_error);
-        return {}, node_error;
-    }
+    rt.attach_node(node, indent = indent);
 
     queue.push(&ctx.node_pairs, node);
     if is_inline {

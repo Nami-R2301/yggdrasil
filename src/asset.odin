@@ -2,8 +2,6 @@ package ygg;
 
 import fmt      "core:fmt";
 import os       "core:os";
-import strings  "core:strings";
-import runtime  "base:runtime";
 import ttf      "vendor:stb/truetype";
 import gl       "vendor:OpenGL";
 
@@ -15,10 +13,7 @@ init_font :: proc (font_name: string = "./res/fonts/default/JetBrainsMono-Regula
     assert(context.user_ptr != nil, "[ERR]:\tCannot init font: Context is nil");
     ctx := cast(^Context)context.user_ptr;
 
-    new_indent := strings.concatenate({indent, "  "});
-    defer delete(new_indent);
-
-    font, font_err := load_font(font_name, new_indent);
+    font, font_err := load_font(font_name, indent);
     if font_err != FontError.None {
         fmt.eprintfln("[ERR]:{} --- Cannot init font {}: {}", indent, font_name, font_err);
         return font_err;
@@ -52,16 +47,11 @@ init_font :: proc (font_name: string = "./res/fonts/default/JetBrainsMono-Regula
 load_font :: proc (path: string, indent: string = "  ") -> (font: types.Font, err: types.Error) {
     using types;
 
-    fmt.printfln("[INFO]:{}| Loading font file {} ... ", indent, path);
+    fmt.printf("[INFO]:{}| Loading font file {} ... ", indent, path);
     bytes := os.read_entire_file_from_filename_or_err(path) or_return;
-    font_info, alloc_err := new(ttf.fontinfo);
-    if alloc_err != runtime.Allocator_Error.None {
-        fmt.eprintfln("[ERR]:{} --- Cannot add font {}: Alloc error: {}", indent, path, alloc_err);
-        return { }, alloc_err;
-    }
-    defer free(font_info);
 
-    if !ttf.InitFont(font_info, raw_data(bytes), 0) {
+    font_info: ttf.fontinfo = {};
+    if !ttf.InitFont(&font_info, raw_data(bytes), 0) {
         return { }, FontError.InvalidFont;
     }
 
@@ -73,7 +63,7 @@ load_font :: proc (path: string, indent: string = "  ") -> (font: types.Font, er
         cdata = make([]ttf.bakedchar, 96)
     };
 
-    fmt.printfln("[INFO]:{}--- Done", indent);
+    fmt.println("Done");
     return font, FontError.None;
 }
 

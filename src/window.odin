@@ -24,17 +24,15 @@ create_window :: proc (
     dimensions:     types.Dimension = { 800, 600 },
     offset:         types.Dimension = { 0, 0 },
     refresh_rate:   types.Option(u16) = nil,
-    indent:         string = "  ") -> (types.Window, types.Error) {
+    indent:         string = "  ") -> types.Window {
     using types;
     using utils;
 
-    fmt.printfln("[INFO]:{}| Creating window '{}' ... ", indent, title);
+    major, minor, _ := glfw.GetVersion();
+    fmt.printf("[INFO]:{}| Creating window '{}' (GLFW {}.{}) ... ", indent, title, major, minor);
     glfw.SetErrorCallback(glfw_error_callback);
 
-    if !bool(glfw.Init()) {
-        fmt.eprintfln("[ERR]: {}--- FATAL: Cannot initialize GLFW", indent);
-        return {}, WindowError.InitError;
-    }
+    assert(bool(glfw.Init()), "[ERR]:\tFATAL: Cannot initialize GLFW");
     new_window : Window = { };
 
     glfw.WindowHint(glfw.OPENGL_DEBUG_CONTEXT, profile == "debug");
@@ -49,9 +47,6 @@ create_window :: proc (
     glfw_handle := glfw.CreateWindow(i32(window_dimensions[0]), i32(window_dimensions[1]),
     strings.unsafe_string_to_cstring(title), nil, nil);
 
-    major, minor, _ := glfw.GetVersion();
-    fmt.printfln("[INFO]:{}  --- GLFW version: {}.{}", indent, major, minor);
-
     glfw.MakeContextCurrent(glfw_handle);
     glfw.SetFramebufferSizeCallback(glfw_handle, glfw_framebuffer_callback);
     glfw.SwapInterval(1);
@@ -62,8 +57,8 @@ create_window :: proc (
     new_window.offset = offset;
     new_window.refresh_rate = refresh_rate;
 
-    fmt.printfln("[INFO]:{}--- Done", indent);
-    return new_window, WindowError.None;
+    fmt.println("Done");
+    return new_window;
 }
 
 destroy_window :: proc (window_handle: ^types.Window, indent: string = "  ") -> types.WindowError {

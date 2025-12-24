@@ -46,11 +46,7 @@ init_context :: proc (
     }
 
     if new_window == nil && !into_bool(parsed_config["headless"]) {
-        window, error := core.create_window("Yggdrasil (Debug)");
-        if error != WindowError.None {
-            return {}, error;
-        }
-
+        window := core.create_window("Yggdrasil (Debug)");
         new_window = new_clone(window);
     }
 
@@ -58,12 +54,7 @@ init_context :: proc (
         if level >= LogLevel.Verbose {
             fmt.printfln("[WARN]:  --- No renderer handle found, creating one ...");
         }
-        renderer, error := core.create_renderer(new_window);
-        if error != RendererError.None {
-            fmt.eprintfln("[ERR]:  --- Error creating context: Renderer error: {}", error);
-            return {}, error;
-        }
-
+        renderer := core.create_renderer(new_window);
         new_renderer = new_clone(renderer);
     }
     return rt.create_context(new_window, new_renderer, config = parsed_config);
@@ -78,14 +69,9 @@ init_context :: proc (
 //                  about memory footprint as long as the context is valid.
 // @param   *ctx*: Context to free and terminate.
 // @return  An error if one occurred.
-terminate_context :: proc () -> types.Error {
-    error := rt.destroy_context();
+terminate_context :: proc (ctx: ^types.Context) {
+    rt.destroy_context(ctx);
 
-    if context.user_ptr == nil {
-        return types.ContextError.InvalidContext;
-    }
-
-    ctx: ^types.Context = cast(^types.Context)context.user_ptr;
     if ctx.window != nil {
         free(ctx.window);
     }
@@ -93,6 +79,4 @@ terminate_context :: proc () -> types.Error {
     if ctx.renderer != nil {
         free(ctx.renderer);
     }
-
-    return error;
 }

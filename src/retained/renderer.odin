@@ -1,13 +1,56 @@
 package retained;
 
 import fmt   "core:fmt";
+import mem   "core:mem";
 import gl    "vendor:OpenGL";
 
 import ygg   "..";
-import types "../types";
+import types "../types"
+import strings "core:strings";
 
-prepare_nodes_for_render :: proc () -> types.Error {
-    panic("Unimplemented");
+batch_nodes :: proc (
+    nodes:          []^types.Node,
+    indent:         string = "  ",
+    allocator:      mem.Allocator = context.allocator) -> types.Error {
+    using types;
+
+    fmt.printfln("[INFO]:{}| Batching nodes for rendering ... ", indent);
+
+    assert(context.user_ptr != nil, "[ERR]:\tCannot prepare nodes for render: Context is nil. Did you forget to set " +
+    " context.user_ptr to 'ctx'?");
+    ctx := cast(^Context)context.user_ptr;
+
+    assert(ctx != nil && ctx.renderer != nil, "[ERR]:\tCannot prepare nodes for render: No renderer found or " +
+        "nil. Did you forget to call 'create_renderer(...)'?");
+
+    for node in nodes {
+        switch node.tag {
+        case "text":
+            if err := ygg.push_text(node, strings.concatenate({indent, "  "}, context.temp_allocator)); err != BufferError.None {
+                fmt.eprintfln("[ERR]:{} --- Cannot prepare nodes for render: {}", indent, err);
+                return err;
+            }
+        case "box":
+            if err := ygg.push_box(node, strings.concatenate({indent, "  "}, context.temp_allocator)); err != BufferError.None {
+                fmt.eprintfln("[ERR]:{} --- Cannot prepare nodes for render: {}", indent, err);
+                return err;
+            }
+        case "img":
+            if err := ygg.push_img(node, strings.concatenate({indent, "  "}, context.temp_allocator)); err != BufferError.None {
+                fmt.eprintfln("[ERR]:{} --- Cannot prepare nodes for render: {}", indent, err);
+                return err;
+            }
+        case:
+            if err := ygg.push_node(node, strings.concatenate({indent, "  "}, context.temp_allocator)); err != BufferError.None {
+                fmt.eprintfln("[ERR]:{} --- Cannot prepare nodes for render: {}", indent, err);
+                return err;
+            }
+        }
+    }
+
+    ctx.renderer.state = RendererState.Prepared;
+    fmt.printfln("[INFO]:{}--- Done", indent);
+    return RendererError.None;
 }
 
 render_now :: proc (indent: string = "  ") -> types.RendererError {

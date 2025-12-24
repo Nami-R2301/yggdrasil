@@ -29,6 +29,11 @@ create_context :: proc (
     using types;
     using utils;
 
+    level : LogLevel = into_debug(config["log_level"]);
+    if level != LogLevel.None {
+        fmt.printf("[INFO]:{}| Creating context ... ", indent);
+    }
+
     ctx = Context {
         window                  = window_handle,
         root                    = nil,
@@ -48,15 +53,11 @@ create_context :: proc (
     }
     ctx.allocator = vmem.arena_allocator(ctx._arena);
 
-    level : LogLevel = into_debug(config["log_level"]);
-
-    if level != LogLevel.None {
-        fmt.printfln("[INFO]:{}| Creating context...", indent);
-    }
-
-    if level != LogLevel.None {
+    if level >= LogLevel.Verbose {
         str := into_str(&ctx, "           ");
-        fmt.printfln("[INFO]:{0}--- Done (\n{2} {1}\n         )", indent, str, "          ");
+        fmt.printfln("\n[INFO]:{0}--- Done (\n{2} {1}\n         )", indent, str, "          ");
+    } else {
+        fmt.println("Done");
     }
 
     return ctx, ContextError.None;
@@ -102,15 +103,10 @@ reset_context :: proc (ctx: ^types.Context, indent: string = "  ") {
 // @param   *ctx*:      The context in question.
 // @param   *indent*:   The depth of the indent for all logs within this function.
 // @return  If there were any errors destroying the context.
-destroy_context :: proc (indent: string = "  ") -> types.Error {
+destroy_context :: proc (ctx: ^types.Context, indent: string = "  ") {
     using types;
     using utils;
 
-    if context.user_ptr == nil {
-        return ContextError.InvalidContext;
-    }
-
-    ctx: ^Context = cast(^Context)context.user_ptr;
     level : LogLevel = into_debug(ctx.config["log_level"]);
 
     if level >= LogLevel.Normal {
@@ -136,8 +132,6 @@ destroy_context :: proc (indent: string = "  ") -> types.Error {
         fmt.printfln("[INFO]:{}--- Done", indent);
     }
 
-    free_all(ctx.allocator);
     vmem.arena_destroy(ctx._arena);
     free(ctx._arena);
-    return ContextError.None;
 }

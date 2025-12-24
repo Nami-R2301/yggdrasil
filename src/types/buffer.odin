@@ -11,6 +11,7 @@ Buffer :: struct {
 
 BufferError :: enum u8 {
     None = 0,
+    InvalidRenderer,
     InvalidPtr,
     BufferNotFound,
     InvalidSize,

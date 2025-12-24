@@ -6,7 +6,8 @@ import strings  "core:strings";
 
 import ygg   "../";
 import types "../types";
-import utils "../utils";
+import utils "../utils"
+import mem "core:mem";
 
 // Low-level API to create a custom UI node, to be attached onto the tree later on. This is normally intended
 // to be abstracted away from the programmer behind high-level API entrypoints like 'begin_node'. One might
@@ -34,15 +35,15 @@ create_node :: proc (
     style:      map[string]types.Option(string)     = { },
     children:   map[types.Id]types.Node             = { },
     user_data:  rawptr                              = nil,
-    indent:     string                              = "  ") -> (types.Node, types.ContextError) {
+    indent:     string                              = "  ") -> types.Node {
     using types;
     using utils;
 
-    if context.user_ptr == nil {
-        return {}, ContextError.InvalidContext;
-    }
+    assert(context.user_ptr != nil, "[ERR]:{}\tCannot create node: Context is nil. Did you forget to set " +
+    "context.user_part to '&ctx' ?");
+    ctx := cast(^Context)context.user_ptr;
 
-    ctx: ^Context = cast(^Context)context.user_ptr;
+    assert(ctx != nil, "[ERR]:\tCannot create node: Context is nil. Did you forget to call 'create_context(...)' ?");
 
     level : LogLevel = into_debug(ctx.config["log_level"]);
     if level >= LogLevel.Verbose {
@@ -54,7 +55,7 @@ create_node :: proc (
     new_id: int     = unwrap_or(id, 0);
     will_overflow   := _check_id_overflow(new_id);
 
-    if will_overflow && level >= LogLevel.Normal {
+    if will_overflow {
         fmt.printfln("[WARN]:{}| Node with ID [{}] will overflow if attached to tree! " +
         "Modify [Id]'s alias to be a bigger type if you need to attach more nodes.",
         indent, new_id);
@@ -64,10 +65,6 @@ create_node :: proc (
         new_id = int(parent_node.id + Id(len(parent_node.children) + 1));
     }
 
-    if level >= LogLevel.Verbose {
-        fmt.println(" Done");
-    }
-
     return Node {
         parent = parent_node,
         id = Id(new_id),
@@ -75,7 +72,7 @@ create_node :: proc (
         children = children,
         style = style,
         user_data = user_data,
-    }, ContextError.None;
+    };
 }
 
 // Deallocate a leaf and all of its children
@@ -94,7 +91,7 @@ destroy_node :: proc (id: types.Id, indent: string = "  ") -> types.Error {
         fmt.printfln("[INFO]:{}| Destroying node [{}] ...", indent, id);
     }
 
-    new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
+    new_indent := strings.concatenate({indent, "  "}, context.temp_allocator) or_return;
     node_ptr := ygg.find_node(id, new_indent);
 
     if node_ptr == nil {
@@ -122,15 +119,11 @@ destroy_node :: proc (id: types.Id, indent: string = "  ") -> types.Error {
 
     for node_to_delete in nodes_to_delete_ordered {
         if len(node_to_delete.children) != 0 {
-            delete_map(node_to_delete.children);
+            delete_map(node_to_delete.children) or_return;
         }
 
         if len(node_to_delete.style) != 0 {
-            delete_map(node_to_delete.style);
-        }
-
-        if node_to_delete.user_data != nil {
-            free(node_to_delete.user_data);
+            delete_map(node_to_delete.style) or_return;
         }
     }
 
@@ -149,19 +142,22 @@ destroy_node :: proc (id: types.Id, indent: string = "  ") -> types.Error {
 //
 // @param ctx:    The current tree where we want to attach this node to.
 // @param node:   Which node is to be added to the tree
-attach_node :: proc (node: types.Node, indent: string = "  ") -> types.Error {
+attach_node :: proc (node: types.Node, indent: string = "  ") {
     using types;
     using utils;
 
-    if context.user_ptr == nil {
-        return ContextError.InvalidContext;
-    }
+    assert(context.user_ptr != nil, "[ERR]:\tCannot attach node: Context is nil. Did you forget to forget to call " +
+    "'create_context(...)' or to assign it to 'context.user_ptr' ?");
 
     ctx: ^Context = cast(^Context)context.user_ptr;
+    assert(context.user_ptr != nil, "[ERR]:\tCannot attach node: Context is nil. Did you forget to forget to call " +
+    "'create_context(...)' ?");
+
     level : LogLevel = into_debug(ctx.config["log_level"]);
 
     parent_ptr : ^Node = node.parent != nil ? node.parent : ctx.last_node;
     new_node   : Node  = node;
+    mem_err: mem.Allocator_Error;
 
     if level >= LogLevel.Verbose {
         fmt.printfln("[INFO]:{}| Attaching node [tag = '{}', id = {} under '{}'] ...", indent, node.tag, node.id,
@@ -169,12 +165,15 @@ attach_node :: proc (node: types.Node, indent: string = "  ") -> types.Error {
     }
 
     if parent_ptr == nil {
-        ctx.root = new_clone(node, ctx.allocator);
+        ctx.root, mem_err = new_clone(node, ctx.allocator);
+        assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
         new_node   = ctx.root^;
         ctx.last_node = ctx.root;
 
     } else if ctx.last_node != parent_ptr {
-        new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
+        new_indent, mem_error := strings.concatenate({indent, "  "}, context.temp_allocator);
+        assert(mem_error == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
+
         parent_ptr = ygg.find_node(parent_ptr.id, new_indent);
 
         if parent_ptr == nil {
@@ -189,7 +188,9 @@ attach_node :: proc (node: types.Node, indent: string = "  ") -> types.Error {
     if parent_ptr != nil && new_node.id == parent_ptr.id {
         fmt.printfln("[WARN]:{}| Overwriting root, setting '{}' as new root ...", indent, node.tag);
         free(ctx.root, ctx.allocator);
-        ctx.root = new_clone(new_node, ctx.allocator);
+        ctx.root, mem_err = new_clone(new_node, ctx.allocator);
+        assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
+
         ctx.last_node = ctx.root;
     } else {
         new_node.parent = parent_ptr;
@@ -200,15 +201,15 @@ attach_node :: proc (node: types.Node, indent: string = "  ") -> types.Error {
     }
 
     if level >= LogLevel.Verbose {
-        new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
+        new_indent, mem_error := strings.concatenate({indent, "  "}, context.temp_allocator);
+        assert(mem_error == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
+
         if parent_ptr != nil {
             ygg.print_nodes(parent_ptr, new_indent);
         }
 
         fmt.printfln("[INFO]:{}--- Done (%p)", indent, ctx.last_node);
     }
-
-    return NodeError.None
 }
 
 // Low-level API to detach a node in the current ui tree. Benefit of this function over its high-level counterparts
@@ -234,7 +235,11 @@ detach_node :: proc (id: types.Id, indent: string = "  ") -> types.Option(^types
         fmt.printfln("[INFO]:{}| Detaching [{}] from context tree ...", indent, id);
     }
 
-    new_indent, _ := strings.concatenate({ indent, "  " }, ctx.allocator);
+    new_indent, err := strings.concatenate({ indent, "  " }, ctx.allocator);
+    if err != mem.Allocator_Error.None {
+        fmt.eprintfln("[ERR]:{} --- Error detaching [{}] from context tree:", indent, id, err);
+        return none(^Node);
+    }
 
     node_ptr := ygg.find_node(id, new_indent);
 
@@ -255,60 +260,59 @@ detach_node :: proc (id: types.Id, indent: string = "  ") -> types.Option(^types
     return node_ptr;
 }
 
-// This function does NOT actually draw contents on the active framebuffer right away, it only compiles it and will
-// be drawn on the next 'render_now()' call.
-text :: proc (str: string, add_to: ^types.Node, indent: string = "  ") -> (text_node: types.Node, err: types.Error) {
+// Create and serialize a text node for rendering. Pre-computes all glyphs required to the text to appear.
+text :: proc (
+    str: string,
+    add_to: ^types.Node,
+    indent: string = "  ") -> types.Node {
     using types;
 
-    fmt.printfln("[INFO]:{}| Preparing text glyphs for {} ... ", indent, str);
+    fmt.printf("[INFO]:{}| Creating text glyphs for '{}' ... ", indent, str);
 
-    assert(context.user_ptr != nil, "[ERR]:\tCannot prepare text: Context is nil");
+    assert(context.user_ptr != nil, "[ERR]:\tCannot create text glyphs: Context is nil!");
     ctx := cast(^Context)context.user_ptr;
+    assert(ctx != nil && ctx.renderer != nil, "[ERR]:\tCannot create text glyphs: Renderer is nil!");
 
     box_vertices := cast(^[5]Vertex)add_to.user_data;
     if box_vertices == nil || size_of(box_vertices) != size_of(^[5]Vertex) {
-        fmt.eprintfln("[ERR]: {}--- Cannot render text {}: Invalid box (add_to)", indent, str);
-        return {}, RendererError.InvalidUserData;
+        fmt.eprintfln("[ERR]: {}--- Cannot create text glyphs {}: Invalid box (add_to)", indent, str);
+        panic("Invalid text data");
     }
 
-    new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
+    new_indent, mem_err := strings.concatenate({indent, "  "}, context.temp_allocator);
+    assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot create box node: Out of memory (just buy more ram)");
 
-    glyphs: [dynamic]Glyph = create_glyphs(str, &ctx.primary_font, 0, 0);
-    ygg.push_data(&ctx.renderer.vbo, Data{ ptr = raw_data(glyphs), count = u64(len(glyphs)), size = size_of(Glyph)},
-    indent = new_indent) or_return;
+    text_node := create_node("text", parent = add_to, indent = new_indent);
+    vertices: [dynamic]Vertex = create_glyphs(str, i32(text_node.id), &ctx.primary_font, 0, 0, allocator = ctx.allocator);
 
-    text_node = create_node("text", parent = add_to, indent = new_indent) or_return;
-    fmt.printfln("[INFO]:{}--- Done", indent);
-    return text_node, RendererError.None;
+    text_node.user_data, mem_err = new_clone(Data {
+        ptr = raw_data(vertices), count = u64(len(vertices)), size = size_of(Vertex)
+    }, ctx.allocator);
+    assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot create box node: Out of memory (just buy more ram)");
+
+    fmt.println("Done", indent);
+    return text_node;
 }
 
-// This function does NOT actually draw contents on the active framebuffer right away, it only compiles it and will
-// be drawn on the next 'render_now()' call.
+// Create and serialize a box node for rendering. Each box is 5 vertices since we are rendering using triangle strips.
 box :: proc (
     size_pixels: [2]u32             = {0, 0},
     offset: types.Option([2]u32)    = nil,  // Optional: Fallback to current cursor position if omitted
     z: f32                          = 0,
     color: [4]f32                   = {},
     roundness: f32                  = 0,
-    indent: string                  = "  ") -> (types.Node, types.Error) {
+    indent: string                  = "  ") -> types.Node {
     using types;
     using utils;
 
-    if context.user_ptr == nil {
-        fmt.printfln("[ERR]:{}| Error drawing box: Context is nil!", indent);
-    }
+    fmt.printf("[INFO]:{}| Creating box node ... ", indent);
 
+    assert(context.user_ptr != nil, "[ERR]:\tCannot create box node: Context is nil!");
     ctx := cast(^Context)context.user_ptr;
+    assert(ctx != nil && ctx.renderer != nil, "[ERR]:\tCannot create box node: Renderer is nil!");
 
-    if ctx.renderer == nil {
-        fmt.eprintfln("[ERR]:{}--- Error drawing box: Renderer is nil!");
-        return {}, RendererError.InvalidRenderer;
-    }
-
-    fmt.printfln("[INFO]:{}| Drawing box ... ", indent);
     offset: [2]u32 = unwrap_or(offset, ctx.cursor[0]);
-
-    triangle_strip := [5]Vertex{
+    triangle_strip, mem_error := new_clone([5]Vertex{
     // Top Left (Red)
         {
             position     = { f32(offset.x), f32(offset.y), 0.0 },
@@ -334,24 +338,23 @@ box :: proc (
             position     = { f32(offset.x) + f32(size_pixels[0]), f32(offset.y), 0.0 },
             color        = color,
         },
-    }
-
-    new_indent, _ := strings.concatenate({indent, "  "}, context.temp_allocator);
-
-    vbo_error  := ygg.prepare_buffer(&ctx.renderer.vbo, Data { ptr = &triangle_strip, count = 5, size = size_of(Vertex) },
-    allocator = ctx.allocator, indent = new_indent);
-    if vbo_error != BufferError.None {
-        fmt.eprintfln("[ERR]:{}--- Error drawing box: {}", vbo_error);
-        return {}, vbo_error;
-    }
+    }, allocator = ctx.allocator);
+    assert(mem_error == mem.Allocator_Error.None, "[ERR]:\tCannot create box node: Out of memory (just buy more ram)");
 
     // Advance cursor
     ctx.cursor[0] += size_pixels[0];
     ctx.cursor[1] += size_pixels[1];
 
+    new_indent, mem_err := strings.concatenate({indent, "  "}, context.temp_allocator);
+    assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot create box node: Out of memory (just buy more ram)");
 
-    fmt.printfln("[INFO]:{}--- Done", indent);
-    return create_node("box", style = {
+    box_node := create_node("box", style = {
         "fill_color" = utils.into_str(color),
-    }, user_data = new_clone(triangle_strip, ctx.allocator));
+    }, indent = new_indent);
+
+    box_node.user_data, mem_err = new_clone(Data { ptr = &triangle_strip, count = 5, size = size_of(Vertex) }, ctx.allocator);
+    assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot create box node: Out of memory (just buy more ram)");
+
+    fmt.println("Done");
+    return box_node;
 }
