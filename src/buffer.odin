@@ -4,14 +4,20 @@ import gl       "vendor:OpenGL";
 import fmt      "core:fmt";
 import mem      "core:mem";
 import strings  "core:strings";
+import runtime  "base:runtime";
 
 import types "types";
 import utils "utils"
 
 C_VBO_SIZE_LIMIT : u64 = 10_000_000;
 
-create_framebuffer :: proc(fbo_width: u32, fbo_height: u32, indent: string = "  ") -> types.Buffer {
+create_framebuffer :: proc "c" (
+    fbo_width: u32,
+    fbo_height: u32,
+    indent: string = "  ") -> types.Buffer {
     using types;
+
+    context = runtime.default_context();
 
     fmt.printf("[INFO]:{}| Creating Framebuffer ... ", indent);
     textures : [2]u32 = { 0, 0 };
@@ -49,11 +55,13 @@ create_framebuffer :: proc(fbo_width: u32, fbo_height: u32, indent: string = "  
     return buffer;
 }
 
-create_buffer :: proc (
+create_buffer :: proc "c" (
     buffer_type:    types.BufferType,
     capacity:       u64 = 1_000_000,
     indent:         string = "  ") -> (types.Buffer, types.Error) {
     using types;
+
+    context = runtime.default_context();
 
     buffer := Buffer {
         id = 0,
@@ -88,8 +96,10 @@ create_buffer :: proc (
     return buffer, BufferError.None;
 }
 
-destroy_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> types.BufferError {
+destroy_buffer :: proc "c" (buffer: ^types.Buffer, indent: string = "  ") -> types.BufferError {
     using types;
+
+    context = runtime.default_context();
 
     fmt.printf("\n[INFO]:{}| Destroying buffer of type '{}' ('') ... ", indent, utils.into_str(buffer));
 
@@ -100,8 +110,10 @@ destroy_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> types.B
 }
 
 // TODO: Check if it is uploaded to GPU and memset it on there as well
-reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> types.BufferError {
+reset_buffer :: proc "c" (buffer: ^types.Buffer, indent: string = "  ") -> types.BufferError {
     using types;
+
+    context = runtime.default_context();
 
     fmt.printf("\n[INFO]:{}| Resetting buffer ({}) ... ", indent, utils.into_str(buffer));
 
@@ -111,11 +123,13 @@ reset_buffer :: proc (buffer: ^types.Buffer, indent: string = "  ") -> types.Buf
     return BufferError.None;
 }
 
-prepare_buffer :: proc (
+prepare_buffer :: proc "c" (
     buffer:         ^types.Buffer,
     opt_data:       types.Data = { },
     indent:         string = "  ") -> types.BufferError {
     using types;
+
+    context = runtime.default_context();
 
     fmt.printf("[INFO]:{}| Preparing {} ... ", indent, buffer.type);
 
@@ -146,7 +160,7 @@ prepare_buffer :: proc (
     if opt_data.ptr != nil {
         new_indent := strings.concatenate({ indent, "  " }, context.temp_allocator);
 
-        if err := push_data(buffer, opt_data, indent = new_indent); err != BufferError.None {
+        if err := push_data(context, buffer, opt_data, indent = new_indent); err != BufferError.None {
             restore_last_buffer_state(buffer);
             return err;
         }
@@ -159,12 +173,14 @@ prepare_buffer :: proc (
     return BufferError.None;
 }
 
-grow_buffer :: proc (
+grow_buffer :: proc "c" (
+    ctx:        runtime.Context,
     buffer:     ^types.Buffer,
     size_bytes: u64,
     indent:     string = "  ") -> types.BufferError {
     using types;
 
+    context = ctx;
 
     fmt.printf("[INFO]:{}| Growing buffer '{}' ({}) from {} bytes to {} ... ", indent, buffer.id, buffer.type, buffer.capacity,
     buffer.capacity + size_bytes);
@@ -174,11 +190,14 @@ grow_buffer :: proc (
     return BufferError.None;
 }
 
-shrink_buffer :: proc (
+shrink_buffer :: proc "c" (
+    ctx:        runtime.Context,
     buffer:     ^types.Buffer,
     size_bytes: u64,
     indent:     string = "  ") -> types.BufferError {
     using types;
+
+    context = ctx;
 
     fmt.printf("\n[INFO]:{}| Shrinking buffer '{}' ({}) from {} bytes to {}... ", indent, buffer.id, buffer.type, buffer.capacity,
     buffer.capacity - size_bytes);
@@ -194,13 +213,16 @@ shrink_buffer :: proc (
     return BufferError.None;
 }
 
-migrate_buffer :: proc (
+migrate_buffer :: proc "c" (
+    ctx:                runtime.Context,
     buffer:             ^types.Buffer,
     new_size_bytes:     u64,
     from_where_bytes:   types.Option(u64) = nil,
-    allocator:          mem.Allocator = context.allocator,
+    allocator:          mem.Allocator,
     indent:             string = "  ") -> (types.Buffer, types.Error) {
     using types;
+
+    context = ctx;
 
     fmt.printfln("[INFO]:{}| Migrating buffer {} ({}) into a new buffer ... ", indent, buffer.id, buffer.type);
 
@@ -224,12 +246,15 @@ migrate_buffer :: proc (
     return dest_buffer, BufferError.None;
 }
 
-push_data :: proc (
+push_data :: proc "c" (
+    ctx:              runtime.Context,
     buffer:           ^types.Buffer,
     data:             types.Data,
     from_where_bytes: types.Option(u64) = nil,
     indent:           string = "  ") -> types.BufferError {
     using types;
+
+    context = ctx;
 
     original_size := buffer.capacity;
     from_where := utils.unwrap_or(from_where_bytes, buffer.length);
@@ -242,7 +267,7 @@ push_data :: proc (
         new_indent, err := strings.concatenate({indent, "  "}, context.temp_allocator);
         assert(err == mem.Allocator_Error.None, "[ERR]:\tCannot push data: Out of memory (buy more ram)");
 
-        if err := grow_buffer(buffer, size_bytes, new_indent); err != BufferError.None {
+        if err := grow_buffer(context, buffer, size_bytes, new_indent); err != BufferError.None {
             return err;
         }
     }
@@ -262,13 +287,16 @@ push_data :: proc (
     return BufferError.None;
 }
 
-pop_data :: proc (
+pop_data :: proc "c" (
+    ctx:              runtime.Context,
     buffer:           ^types.Buffer,
     size_bytes:       u64,
     count:            u64,
     from_where_bytes: types.Option(u64) = nil,
     indent:           string = "  ") -> (types.Data, types.Error) {
     using types;
+
+    context = ctx;
 
     from_where := utils.unwrap_or(from_where_bytes, buffer.length);
     fmt.printf("[INFO]:{}| [{}] | Popping {} bytes at {}/{} ... ", indent, buffer.type, size_bytes, from_where, buffer.capacity);
@@ -292,8 +320,13 @@ pop_data :: proc (
     return Data{ ptr = get_data, count = count, size = size_bytes }, BufferError.None;
 }
 
-push_text :: proc (text: ^types.Node, indent: string = "  ") -> types.Error {
+push_text :: proc "c" (
+    ctx:    runtime.Context,
+    text:   ^types.Node,
+    indent: string = "  ") -> types.Error {
     using types;
+
+    context = ctx;
 
     assert(context.user_ptr != nil, "[ERR]:\tCannot push text: Context is nil. Did you forget to call 'create_context' " +
     "or to set context.user_ptr to '&ctx' ?");
@@ -310,7 +343,7 @@ push_text :: proc (text: ^types.Node, indent: string = "  ") -> types.Error {
         return BufferError.InvalidPtr;
     }
 
-    if err := push_data(&ctx.renderer.vbo, data^, indent = indent); err != nil {
+    if err := push_data(context, &ctx.renderer.pipeline.vbo, data^, indent = indent); err != nil {
         fmt.eprintfln("[ERR]:{} --- Cannot push text: {}", indent, err);
         return err;
     }
@@ -320,8 +353,13 @@ push_text :: proc (text: ^types.Node, indent: string = "  ") -> types.Error {
     return BufferError.None;
 }
 
-push_box :: proc (box: ^types.Node, indent: string = "  ") -> types.Error {
+push_box :: proc "c" (
+    ctx:    runtime.Context,
+    box:    ^types.Node,
+    indent: string = "  ") -> types.Error {
     using types;
+
+    context = ctx;
 
     assert(context.user_ptr != nil, "[ERR]:\tCannot push box: Context is nil. Did you forget to call 'create_context' " +
     "or to set context.user_ptr to '&ctx' ?");
@@ -338,7 +376,7 @@ push_box :: proc (box: ^types.Node, indent: string = "  ") -> types.Error {
         return BufferError.InvalidPtr;
     }
 
-    if err := push_data(&ctx.renderer.vbo, data^, indent = indent); err != nil {
+    if err := push_data(context, &ctx.renderer.pipeline.vbo, data^, indent = indent); err != nil {
         fmt.eprintfln("[ERR]:{} --- Cannot push text: {}", indent, err);
         return err;
     }
@@ -348,15 +386,15 @@ push_box :: proc (box: ^types.Node, indent: string = "  ") -> types.Error {
     return BufferError.None;
 }
 
-push_img :: proc (img: ^types.Node, indent: string = "  ") -> types.Error {
-    panic("Unimplemented");
+push_img :: proc "c" (ctx: runtime.Context, img: ^types.Node, indent: string = "  ") -> types.Error {
+    panic_contextless("Unimplemented");
 }
 
-push_node :: proc (custom_node: ^types.Node, indent: string = "  ") -> types.Error {
-    panic("Unimplemented");
+push_node :: proc "c" (ctx: runtime.Context, custom_node: ^types.Node, indent: string = "  ") -> types.Error {
+    panic_contextless("Unimplemented");
 }
 
-restore_last_buffer_state :: proc "contextless" (current_buffer: ^types.Buffer) {
+restore_last_buffer_state :: proc "c" (current_buffer: ^types.Buffer) {
     using types;
 
     switch current_buffer.type {
@@ -377,7 +415,7 @@ restore_last_buffer_state :: proc "contextless" (current_buffer: ^types.Buffer) 
     }
 }
 
-get_last_vao :: proc "contextless" () -> (u32, bool) {
+get_last_vao :: proc "c" () -> (u32, bool) {
     vao_id : i32 = 0;
 
     gl.GetIntegerv(gl.VERTEX_ARRAY_BINDING, &vao_id);
@@ -388,7 +426,7 @@ get_last_vao :: proc "contextless" () -> (u32, bool) {
     return u32(vao_id), true;
 }
 
-get_last_vbo :: proc "contextless" () -> (u32, bool) {
+get_last_vbo :: proc "c" () -> (u32, bool) {
     vbo_id : i32 = 0;
 
     gl.GetIntegerv(gl.ARRAY_BUFFER_BINDING, &vbo_id);
@@ -399,7 +437,7 @@ get_last_vbo :: proc "contextless" () -> (u32, bool) {
     return u32(vbo_id), true;
 }
 
-get_last_texture :: proc "contextless" () -> (u32, bool) {
+get_last_texture :: proc "c" () -> (u32, bool) {
     texture_id: i32 = 0;
 
     gl.GetIntegerv(gl.TEXTURE_BINDING_2D, &texture_id);
@@ -410,7 +448,7 @@ get_last_texture :: proc "contextless" () -> (u32, bool) {
     return u32(texture_id), true;
 }
 
-_into_gl_type :: proc "contextless" (buffer_type: types.BufferType) -> u32 {
+_into_gl_type :: proc "c" (buffer_type: types.BufferType) -> u32 {
     using types;
 
     switch buffer_type {

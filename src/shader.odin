@@ -15,7 +15,7 @@ load_shaders :: proc (filepaths: []string = {}) -> (u32, types.ShaderError) {
     return program_id, ShaderError.None;
 }
 
-get_last_program :: proc "contextless" () -> (u32, bool) {
+get_last_program :: proc "c" () -> (u32, bool) {
     program_id: i32 = 0;
 
     gl.GetIntegerv(gl.CURRENT_PROGRAM, &program_id);

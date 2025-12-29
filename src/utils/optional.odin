@@ -8,15 +8,15 @@ import types "../types";
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-some :: proc "contextless" (value: $T) -> types.Option(T) {
+some :: proc "c" (value: $T) -> types.Option(T) {
   return value;
 }
 
-none :: proc "contextless" ($T: typeid) -> types.Option(T) {
+none :: proc "c" ($T: typeid) -> types.Option(T) {
   return nil;
 }
 
-is_some :: proc "contextless" (opt: types.Option($T)) -> bool {
+is_some :: proc "c" (opt: types.Option($T)) -> bool {
   #partial switch v in opt {
     case T:       return true;
     case rawptr:  return false;
@@ -35,7 +35,7 @@ unwrap :: proc (opt: types.Option($T)) -> T {
   return T{};  // Unreachable
 }
 
-unwrap_or :: proc "contextless" (opt: types.Option($T), default: T) -> T {
+unwrap_or :: proc "c" (opt: types.Option($T), default: T) -> T {
   switch value in opt {
     case T:        return value;
     case rawptr:   return default;

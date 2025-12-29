@@ -1,9 +1,7 @@
 package ygg;
 
-import fmt      "core:fmt";
-import os       "core:os";
-import ttf      "vendor:stb/truetype";
-import runtime  "base:runtime";
+import ttf   "vendor:stb/truetype";
+import mem   "core:mem";
 
 import types "types";
 import utils "utils";
@@ -16,19 +14,24 @@ import utils "utils";
 //                    config is provided.
 // @param   *indent*: The depth of the indent for all logs within this function.
 // @return  A sanitized version of the config provided as input.
-sanitize_config :: proc (config_opt: types.Option(map[string]types.Option(string)) = nil, indent: string = "  ") -> (map[string]string, types.Error) {
+sanitize_config :: proc (
+    config_opt: types.Option(map[string]types.Option(string)) = nil,
+    indent:     string = "  ",
+    allocator:  mem.Allocator = context.allocator) -> (map[string]string, types.Error) {
     using types;
     using utils;
 
+    context.allocator = allocator;
+
     new_config := default_config();
     config_read: map[string]Option(string) = {};
-    if !is_some(config_opt) {
-        // Attempt to read from toml file.
-        config_read, error := read_config();
-        if error != ConfigError.None {
-            return {}, error;
-        }
-    }
+//    if !is_some(config_opt) {
+//        // Attempt to read from toml file.
+//        config_read, error := read_config();
+//        if error != ConfigError.None {
+//            return {}, error;
+//        }
+//    }
 
     for key, value_opt in config_read {
         if is_some(value_opt) {

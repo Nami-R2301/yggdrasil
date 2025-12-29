@@ -13,10 +13,7 @@ ProgramError :: enum u8 {
 Renderer :: struct {
   node_queue:   queue.Queue(Node),
   textures:     [dynamic]Buffer,
-  vao:          Buffer,
-  vbo:          Buffer,
-  framebuffer:  Buffer,
-  program:      Program,
+  pipeline:     BufferPipeline,
   state:        RendererState,
 }
 
@@ -25,6 +22,13 @@ RendererState :: enum u8 {
   Initialized,
   Prepared,
   Destroyed
+}
+
+BufferPipeline :: struct {
+  vao:          Buffer,
+  vbo:          Buffer,
+  framebuffer:  Buffer,
+  program:      Program,
 }
 
 RendererError :: enum u8 {

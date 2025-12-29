@@ -1,50 +1,50 @@
 package immediate;
 
-import glfw "vendor:glfw";
-import queue "core:container/queue";
+import runtime  "base:runtime";
+import queue    "core:container/queue";
 
-import rt "../retained";
+import core   "..";
 import types "../types";
 
-begin_frame :: proc () {
-    assert(context.user_ptr != nil, "[ERR]:\t| Error beginning frame: Context is nil!");
-    ctx: ^types.Context = cast(^types.Context)context.user_ptr;
+begin_frame :: proc "c" (ctx: runtime.Context) {
+    using types;
 
-    queue.init(&ctx.node_pairs);
+    context = ctx;
+    core_ctx := cast(^Context)ctx.user_ptr;
+    assert_contextless(core_ctx != nil, "[ERR]:\tCannot begin frame: Context is nil. Did you forget to call 'create_context(...)' ?");
 
-    if ctx.renderer != nil {
-        queue.init(&ctx.renderer.node_queue);
-    }
+    queue.init(&core_ctx.node_pairs);
 
-    if ctx.window != nil {
-        glfw.PollEvents();
+    if core_ctx.renderer != nil {
+        queue.init(&core_ctx.renderer.node_queue);
     }
 }
 
-end_frame :: proc () {
-    assert(context.user_ptr != nil, "[ERR]:\t| Error ending frame: Context is nil!");
-    ctx: ^types.Context = cast(^types.Context)context.user_ptr;
+end_frame :: proc "c" (ctx: runtime.Context) {
+    using types;
 
-    assert(queue.len(ctx.node_pairs) == 0, "[ERR]:\t| Error ending frame: One or more nodes are not closed properly - did you add or forget some 'end_nodes(...)'?");
+    context = ctx;
+    core_ctx := cast(^Context)ctx.user_ptr;
+    assert_contextless(core_ctx != nil, "[ERR]:\tCannot end frame: Context is nil. Did you forget to call 'create_context(...)' ?");
 
-    if ctx.window != nil {
-        glfw.SwapBuffers(ctx.window.glfw_handle);
-    }
+    assert_contextless(queue.len(core_ctx.node_pairs) == 0, "[ERR]:\tCannot end frame: One or more nodes are not closed properly. " +
+    "Did you add or forget some matching 'end_nodes(...)' to your 'begin_nodes(...)' ?");
 
-    if ctx.renderer != nil {
-        queue.destroy(&ctx.renderer.node_queue);
+    if core_ctx.renderer != nil {
+        core.render_now(core_ctx.window.dimensions, core_ctx.renderer.pipeline);
+        queue.destroy(&core_ctx.renderer.node_queue);
     }
 
     // Cleanup queue & tree.
-    for queue.len(ctx.node_pairs) > 0 {
-        item := queue.pop_back(&ctx.node_pairs);
-        rt.detach_node(item.id);
+    for queue.len(core_ctx.node_pairs) > 0 {
+        item := queue.pop_back(&core_ctx.node_pairs);
+        core.detach_node(ctx, item.id);
     }
-    queue.destroy(&ctx.node_pairs);
+    queue.destroy(&core_ctx.node_pairs);
 
-    rt.detach_node(ctx.root.id);
-    free(ctx.root, ctx.allocator);
-    ctx.root = nil;
-    ctx.last_node = nil;
+    core.detach_node(ctx, core_ctx.root.id);
+    free(core_ctx.root, ctx.allocator);
+    core_ctx.root = nil;
+    core_ctx.last_node = nil;
 }
 

@@ -65,7 +65,7 @@ default_log_level :: proc (log: types.LogLevel) -> types.LogLevel {
   return types.LogLevel.Normal;
 }
 
-default_config :: proc (config: map[string]string = {}) -> map[string]string {
+default_config :: proc () -> map[string]string {
   default: map[string]string = {};
 
   default["log_level"]    = "v";

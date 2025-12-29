@@ -190,3 +190,15 @@ into_quad :: proc (vertices_ptr: ^[5]types.Vertex) -> stb_font.Quad {
 
     return stb_font.Quad { tl, tr, br, bl };
 }
+
+into_measure :: proc (measure_str: types.Option(string)) -> [2]u32{
+    panic("Unimplemented");
+}
+
+into_z_index :: proc (z_index_str: types.Option(string)) -> u16 {
+    panic("Unimplemented");
+}
+
+into_color :: proc (color_str: types.Option(string)) -> [4]f32 {
+    panic("Unimplemented");
+}

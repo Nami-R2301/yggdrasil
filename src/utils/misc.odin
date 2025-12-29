@@ -1,7 +1,8 @@
 package utils;
 
-import "core:math";
-import "base:runtime";
+import mem     "core:mem";
+import runtime "base:runtime";
+import math    "core:math";
 
 import types "../types";
 
@@ -11,12 +12,20 @@ import types "../types";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+temp_alloc :: proc() -> mem.Arena {
+    buffer: [1024]byte
+    arena: mem.Arena;
+    mem.arena_init(&arena, buffer[:]);
+
+    return arena;
+}
+
 
 // A generic procedure to check if the value provided would overflow the alias used for IDs.
 //
 // @param   Value to test overflow with current types.Id alias size.
 // @return  If the value provided would overflow with the current types.Id encoding.
-_check_id_overflow :: proc(value: $T) -> bool {
+check_id_overflow :: proc(value: $T) -> bool {
     // Only unsigned.
     switch size_of(types.Id) {
         case 1: return value > 255
@@ -33,7 +42,7 @@ _check_id_overflow :: proc(value: $T) -> bool {
 //
 // @param   Type to get maximum possible value out of.
 // @return  The maximum value for that number type in float to support floats as well.
-_get_max_number :: proc($T: typeid) -> f64 {
+get_max_number :: proc($T: typeid) -> f64 {
     info := runtime.__type_info_of(T);
 
     #partial switch variant in info.variant {

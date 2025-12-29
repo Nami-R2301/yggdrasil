@@ -13,7 +13,6 @@ Error :: union {
   BufferError,
   ProgramError,
   ShaderError,
-  TextureError,
   FontError,
   os.Error,
   runtime.Allocator_Error

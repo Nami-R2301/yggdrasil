@@ -3,33 +3,36 @@ package immediate;
 import fmt      "core:fmt";
 import strings  "core:strings";
 import queue    "core:container/queue";
+import runtime  "base:runtime";
 
-import rt       "../retained";
 import ygg      "../";
 import types    "../types";
 
-begin_node :: proc (
+begin_node :: proc "c" (
+    ctx:        runtime.Context,
     tag:        string,
     is_inline:  bool = false,
     style:      map[string]types.Option(string) = {},
     indent: string = "  ") -> (types.Node, types.Error) {
     using types;
 
-    assert(context.user_ptr != nil, "[ERR]:\t| Error creating node: Context is nil!");
-    ctx: ^Context = cast(^Context)context.user_ptr;
+    context = ctx;
 
-    node := rt.create_node(tag = tag, style = style);
+    ygg_ctx := cast(^Context)ctx.user_ptr;
+    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot begin node: Context is nil. Did you forget to call 'create_context(...)' ?");
 
-    if queue.len(ctx.node_pairs) > 0 {
-        node.parent = queue.back_ptr(&ctx.node_pairs);
+    node := ygg.create_node(ctx, tag = tag, style = style);
+
+    if queue.len(ygg_ctx.node_pairs) > 0 {
+        node.parent = queue.back_ptr(&ygg_ctx.node_pairs);
     }
 
     new_indent := strings.concatenate({indent, "  "}, context.temp_allocator);
-    rt.attach_node(node, indent = indent);
+    ygg.attach_node(ctx, node, indent = indent);
 
-    queue.push(&ctx.node_pairs, node);
+    queue.push(&ygg_ctx.node_pairs, node);
     if is_inline {
-        error := end_node(node.tag);
+        error := end_node(ctx, node.tag);
         if error != NodeError.None {
             return {}, error;
         }
@@ -38,92 +41,57 @@ begin_node :: proc (
     return node, NodeError.None;
 }
 
-end_node :: proc (tag: string, indent: string = "  ") -> types.NodeError {
+end_node :: proc "c" (
+    ctx: runtime.Context,
+    tag: string,
+    indent: string = "  ") -> types.NodeError {
     using types;
 
-    assert(context.user_ptr != nil, "[ERR]:\t| Error ending node: Context is nil!");
-    ctx: ^Context = cast(^Context)context.user_ptr;
+    context = ctx;
+
+    ygg_ctx := cast(^Context)ctx.user_ptr;
+    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot end node: Context is nil. Did you forget to call 'create_context(...)' ?");
 
     new_indent, _ := strings.concatenate({ indent, "  " }, context.temp_allocator);
-    node_ptr      := ygg.find_node(tag, indent = new_indent);
+    node_ptr      := ygg.find_node(ctx, tag, indent = new_indent);
 
     if node_ptr == nil {
-        fmt.printfln("[ERR]:{}| Error ending node: Node given is 'None' ({})", indent)
+        fmt.printfln("[ERR]:{}| Cannot end node: Node given is 'None' ({})", indent)
         return NodeError.InvalidNode;
     }
 
     // Add to rendering queue and pop from queue list at the same time.
-    queue.pop_back(&ctx.node_pairs);
+    queue.pop_back(&ygg_ctx.node_pairs);
     return NodeError.None;
 }
 
-img :: proc (
+img :: proc "c" (
+    ctx: runtime.Context,
     is_inline:  bool = false,
     style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
+    panic_contextless("Unimplemented");
 }
 
-input :: proc (
+input :: proc "c" (
+    ctx: runtime.Context,
     is_inline:  bool = false,
     style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
-}
-
-li :: proc (
-    is_inline:  bool = false,
-    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
-}
-
-link :: proc (
-    is_inline:  bool = false,
-    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-
-    return begin_node("link", is_inline, style);
-}
-
-meta :: proc (
-    is_inline:  bool = false,
-    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
-}
-
-nav :: proc (
-    is_inline:  bool = false,
-    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
-}
-
-ol :: proc (
-    is_inline:  bool = false,
-    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
-}
-
-// High Level API to create and link a JS script.
-script :: proc (
-    is_inline:  bool = false,
-    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
+    panic_contextless("Unimplemented");
 }
 
 // High level API to create a h1-h9 node.
-text :: proc (
-    str:       string,
+text :: proc "c" (
+    ctx: runtime.Context,
+    content:    string,
     is_inline:  bool = false,
     style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    return begin_node("title", is_inline, style);
+    return begin_node(ctx, "title", is_inline, style);
 }
 
-ul :: proc (
+video :: proc "c" (
+    ctx: runtime.Context,
     is_inline:  bool = false,
     style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
-}
-
-video :: proc (
-    is_inline:  bool = false,
-    style:      map[string]types.Option(string) = {}) -> (types.Node, types.Error) {
-    panic("Unimplemented");
+    panic_contextless("Unimplemented");
 }
 

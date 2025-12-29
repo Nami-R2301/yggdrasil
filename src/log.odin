@@ -1,7 +1,7 @@
 package ygg;
 
-import fmt "core:fmt";
-import strings "core:strings";
+import fmt      "core:fmt";
+import strings  "core:strings";
 
 import types "types";
 
