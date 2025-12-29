@@ -14,6 +14,6 @@ main :: proc () {
     context.temp_allocator = mem.tracking_allocator(&track)
     defer free_all(context.temp_allocator);
 
-    hello_immediate();
+//    hello_immediate();
     hello_retained();
 }
