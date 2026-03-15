@@ -2,7 +2,6 @@
 package ygg;
 
 import fmt     "core:fmt";
-import queue   "core:container/queue";
 import mem     "core:mem";
 import linalg  "core:math/linalg";
 import runtime "base:runtime";
@@ -15,32 +14,36 @@ import strings "core:strings";
 
 // Core API to create and initialize an OpenGL renderer for displaying the UI nodes. Note that, we are technically using
 // 3D space for z-indices, but everything else can be considered in 2D space. In order to make this renderer agnostic, all GL
-// calls properly revert the GL states to what they were prior to any calls. Due to this nature, an additional
-// framebuffer gets created and only that one gets swapped to keep all apps calling this library as a UI layer intact.
+// calls properly revert the GL states to what they were prior to any calls. Due to this nature, an additional framebuffer
+// gets created and only that one gets swapped to keep all apps calling this library as a UI layer intact.
 //
-// @lifetime                        No heap memory footprint here. Only loading shaders require heap data, and that is
-//                                  handled with the temp allocator. Does not require context's 'user_ptr' to be set.
+// @lifetime        No heap memory footprint here. Only loading shaders require heap data, and that is handled with the
+//                  temp allocator. Does not require context's 'user_ptr' to be set.
 //
-// @param *window*:                 The window context (GLFW). Used to determine initial viewport sizes and OpenGL version.
-// @param *indent*:                 The depth of the indent for all logs within this function.
+// @param *window*: The window context (GLFW). Used to determine initial viewport sizes and OpenGL version.
+// @param *indent*: The depth of the indent for all logs within this function.
 //
-// @return                          A renderer instance initialized. This function does return failure states, any
-//                                  failure makes the program panic immediately.
+// @return          A renderer instance initialized. This function does return failure states, any failure makes the
+//                  program panic immediately.
+@(export, link_prefix="ygg_", require_results)
 create_renderer :: proc "c" (
-    window:                 ^types.Window,
-    indent:                 string = "  ") -> types.Renderer {
-    using types;
-
-    assert_contextless(window != nil, "[ERR]:\tError creating renderer: Window is nil!");
+    window_ptr:  ^types.Window,
+    indent:      cstring = "  ") -> types.Renderer {
+    assert_contextless(window_ptr != nil, "[ERR]:\tError creating renderer: Window is nil!");
     context = runtime.default_context();
+    if size_of(window_ptr^) != size_of(types.Window) {
+        fmt.eprintfln("[ERR]:{}| Window passed is not a valid ygg window: {} vs {} bytes", indent,
+        size_of(window_ptr^), size_of(types.Window));
+        panic("Config Error");
+    }
 
-    desired_major_version := window.gl_version[0];
-    desired_minor_version := window.gl_version[1];
+    desired_major_version := window_ptr.gl_version[0];
+    desired_minor_version := window_ptr.gl_version[1];
 
     fmt.printfln("[INFO]:{}| Creating renderer (OpenGL {}.{} bindings) ... ",
         indent, desired_major_version, desired_minor_version);
 
-    // Load GL functions.
+    // Load GL bindings from 1.0 to desired version.
     gl.load_up_to(int(desired_major_version), int(desired_minor_version), glfw.gl_set_proc_address);
 
     // Enable error handling for OpenGL calls.
@@ -53,29 +56,30 @@ create_renderer :: proc "c" (
     }
 
     // Init buffers
-    new_indent, err := strings.concatenate({indent, "  "}, context.temp_allocator);
+    new_indent, err := strings.concatenate({string(indent), "  "}, context.temp_allocator);
     assert(err == mem.Allocator_Error.None, "[ERR]:\tCannot create renderer: Out of memory (buy more ram)");
 
     buffer_vao, buffer_vbo := create_initial_buffers(new_indent);
     vbo_error := prepare_buffer(&buffer_vbo, indent = new_indent);
+    assert(vbo_error == types.BufferError.None, "[ERR]:\tError preparing VBO");
 
     // Create UI Layer
-    fbo        := create_framebuffer(window.dimensions[0], window.dimensions[1], indent = new_indent);
+    fbo        := create_framebuffer(window_ptr.width, window_ptr.height, indent = new_indent);
     fbo_error  := prepare_buffer(&fbo, indent = new_indent);
-    assert(fbo_error == BufferError.None, "[ERR]:\tError preparing Framebuffer");
+    assert(fbo_error == types.BufferError.None, "[ERR]:\tError preparing Framebuffer");
 
-    renderer : Renderer = {
+    renderer : types.Renderer = {
         pipeline = {
             vao = buffer_vao,
             vbo = buffer_vbo,
             framebuffer = fbo
         },
-        state = RendererState.Initialized
+        state = types.RendererState.Initialized
     };
 
     // Init basic shader
     program_id, error   := load_shaders(filepaths = {"./res/main.vert", "./res/main.frag"});
-    if error != ShaderError.None {
+    if error != types.ShaderError.None {
         fmt.println("[ERR]:{}--- Error loading vertex and fragment shaders");
     } else {
         fmt.printfln("[INFO]:{}--- Done", indent);
@@ -96,20 +100,15 @@ create_renderer :: proc "c" (
 // @return                  On error, returns the renderer error that occured. Note that, this error will automatically
 //                          be logged before returning and that in the event where the renderer did not have any GPU
 //                          buffer data, some OpenGL errors may be logged in the console.
-destroy_renderer :: proc "c" (renderer_ptr: ^types.Renderer, indent: string = "  ") -> types.RendererError {
-    using types;
-
+@(export, link_prefix="ygg_")
+destroy_renderer :: proc "c" (renderer_ptr: ^types.Renderer, indent: cstring = "  ") -> types.RendererError {
     context = runtime.default_context();
 
     fmt.printf("[INFO]:{}| Destroying renderer ... ", indent);
     if renderer_ptr == nil {
         fmt.eprintfln("[ERR]:{}--- Error when finding buffer: No renderer found! Did you forget to first call 'create_renderer()'?",
         indent);
-        return RendererError.InvalidRenderer;
-    }
-
-    if queue.len(renderer_ptr.node_queue) > 0 {
-        queue.destroy(&renderer_ptr.node_queue);
+        return types.RendererError.InvalidRenderer;
     }
 
     gl.DeleteProgram(renderer_ptr.pipeline.program);
@@ -126,62 +125,60 @@ destroy_renderer :: proc "c" (renderer_ptr: ^types.Renderer, indent: string = " 
     }
     delete(renderer_ptr.textures);
 
-    renderer_ptr.state = RendererState.Destroyed;
+    renderer_ptr.state = types.RendererState.Destroyed;
     fmt.println("Done");
-    return RendererError.None;
+    return types.RendererError.None;
 }
 
+@(export, link_prefix="ygg_")
 prepare_nodes :: proc "c" (
-    ctx:            runtime.Context,
-    nodes:          []^types.Node,
-    indent:         string = "  ") -> types.Error {
-    using types;
+    ctx:       ^types.Context,
+    nodes:     []^types.Node,
+    indent:    string = "  ") -> types.Error {
+    assert_contextless(ctx != nil, "[ERR]:\tCannot prepare nodes for render: Context is nil. Did you forget to call " +
+    " create_context(...)?");
+    assert_contextless(ctx.renderer != nil, "[ERR]:\tCannot prepare nodes for render: No renderer found. Did you " +
+    "forget to call create_renderer(...) ?");
 
-    context = ctx;
-    ygg_ctx := cast(^Context)ctx.user_ptr;
-    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot prepare nodes for render: Context is nil. Did you forget to set " +
-    " context.user_ptr to 'ctx'?");
+    context = ctx._context;
 
     fmt.printfln("[INFO]:{}| Batching nodes for rendering ... ", indent);
 
-    assert_contextless(ygg_ctx.renderer != nil, "[ERR]:\tCannot prepare nodes for render: No renderer found. Did you " +
-    "forget to call create_renderer(...) ?");
-
+    inner_indent := strings.concatenate({indent, "  "}, context.temp_allocator)
     for node in nodes {
         switch node.tag {
         case "text":
-            if err := push_text(context, node, strings.concatenate({indent, "  "}, context.temp_allocator)); err != BufferError.None {
+            if err := push_text(ctx, node, inner_indent); err != types.BufferError.None {
                 fmt.eprintfln("[ERR]:{} --- Cannot prepare nodes for render: {}", indent, err);
                 return err;
             }
         case "box":
-            if err := push_box(context, node, strings.concatenate({indent, "  "}, context.temp_allocator)); err != BufferError.None {
+            if err := push_box(ctx, node, inner_indent); err != types.BufferError.None {
                 fmt.eprintfln("[ERR]:{} --- Cannot prepare nodes for render: {}", indent, err);
                 return err;
             }
         case "img":
-            if err := push_img(context, node, strings.concatenate({indent, "  "}, context.temp_allocator)); err != BufferError.None {
+            if err := push_img(ctx, node, inner_indent); err != types.BufferError.None {
                 fmt.eprintfln("[ERR]:{} --- Cannot prepare nodes for render: {}", indent, err);
                 return err;
             }
         case:
-            if err := push_node(context, node, strings.concatenate({indent, "  "}, context.temp_allocator)); err != BufferError.None {
+            if err := push_node(ctx, node, inner_indent); err != types.BufferError.None {
                 fmt.eprintfln("[ERR]:{} --- Cannot prepare nodes for render: {}", indent, err);
                 return err;
             }
         }
     }
 
-    ygg_ctx.renderer.state = RendererState.Prepared;
+    ctx.renderer.state = types.RendererState.Prepared;
     fmt.printfln("[INFO]:{}--- Done", indent);
-    return RendererError.None;
+    return types.RendererError.None;
 }
 
+@(export, link_prefix="ygg_")
 render_now :: proc "c" (
     viewport: [2]u32,
     pipeline: types.BufferPipeline) -> types.RendererError {
-    using types;
-
     // Used to later revert buffers, program, and states
     // Don't assume we are the only renderer active, properly revert everything
     last_vao, vao_exists := get_last_vao();
@@ -233,18 +230,16 @@ render_now :: proc "c" (
     gl.Enable(gl.CULL_FACE);
     gl.Disable(gl.BLEND);
 
-    return RendererError.None;
+    return types.RendererError.None;
 }
 
 @(private)
 update_viewport_and_camera :: proc "c" (width, height: i32, indent: string = "  ") -> types.Error {
-    using types;
-
     gl.Viewport(0, 0, width, height)
 
     program_id, exists := get_last_program();
     if !exists {
-        return ProgramError.ProgramNotFound;
+        return types.ProgramError.ProgramNotFound;
     }
 
     gl.UseProgram(program_id);
@@ -264,7 +259,7 @@ update_viewport_and_camera :: proc "c" (width, height: i32, indent: string = "  
         gl.UniformMatrix4fv(loc_view, 1, false, &projection[0, 0])
     }
 
-    return ProgramError.None;
+    return types.ProgramError.None;
 }
 
 @(private)
@@ -313,8 +308,6 @@ gl_asynchronous_error_callback :: proc "c" (
 
 @(private)
 create_initial_buffers :: proc "c" (indent: string = "  ") -> (types.Buffer, types.Buffer) {
-    using types;
-
     context = runtime.default_context();
 
     fmt.printfln("[INFO]:{}| Creating initial buffers for rendering ... ", indent);
@@ -322,8 +315,8 @@ create_initial_buffers :: proc "c" (indent: string = "  ") -> (types.Buffer, typ
     new_indent, err := strings.concatenate({indent, "  "}, context.temp_allocator);
     assert_contextless(err == mem.Allocator_Error.None, "[ERR]:\tCannot create renderer: Out of memory (buy more ram)");
 
-    vao_buffer, _ := create_buffer(BufferType.Vao, capacity = 1, indent = new_indent);
-    vbo_buffer, _ := create_buffer(BufferType.Vbo, indent = new_indent);
+    vao_buffer, _ := create_buffer(types.BufferType.Vao, capacity = 1, indent = new_indent);
+    vbo_buffer, _ := create_buffer(types.BufferType.Vbo, indent = new_indent);
 
     last_vao_bound : i32 = 0;
     last_vbo_bound : i32 = 0;

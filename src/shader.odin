@@ -4,17 +4,17 @@ import gl "vendor:OpenGL";
 
 import types "types";
 
+@(export, link_prefix="ygg_", require_results)
 load_shaders :: proc (filepaths: []string = {}) -> (u32, types.ShaderError) {
-    using types;
-
     program_id, is_ok := gl.load_shaders(filepaths[0], filepaths[1]);
     if !is_ok {
-        return program_id, ShaderError.ProgramError;
+        return program_id, types.ShaderError.ProgramError;
     }
 
-    return program_id, ShaderError.None;
+    return program_id, types.ShaderError.None;
 }
 
+@(export, link_prefix="ygg_", require_results)
 get_last_program :: proc "c" () -> (u32, bool) {
     program_id: i32 = 0;
 

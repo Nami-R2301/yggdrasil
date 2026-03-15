@@ -11,12 +11,11 @@ import utils "utils"
 
 C_VBO_SIZE_LIMIT : u64 = 10_000_000;
 
+@(export, link_prefix="ygg_")
 create_framebuffer :: proc "c" (
     fbo_width: u32,
     fbo_height: u32,
     indent: string = "  ") -> types.Buffer {
-    using types;
-
     context = runtime.default_context();
 
     fmt.printf("[INFO]:{}| Creating Framebuffer ... ", indent);
@@ -44,8 +43,8 @@ create_framebuffer :: proc "c" (
     gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, i32(fbo_width), i32(fbo_height), 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_BYTE, nil);
     gl.BindTexture(gl.TEXTURE_2D, 0);
 
-    buffer := Buffer {
-        type = BufferType.Framebuffer,
+    buffer := types.Buffer {
+        type = types.BufferType.Framebuffer,
         count = 1,
         attachments_opt = textures
     };
@@ -55,15 +54,14 @@ create_framebuffer :: proc "c" (
     return buffer;
 }
 
+@(export, link_prefix="ygg_")
 create_buffer :: proc "c" (
     buffer_type:    types.BufferType,
     capacity:       u64 = 1_000_000,
     indent:         string = "  ") -> (types.Buffer, types.Error) {
-    using types;
-
     context = runtime.default_context();
 
-    buffer := Buffer {
+    buffer := types.Buffer {
         id = 0,
         type = buffer_type,
         count = 0,
@@ -80,25 +78,24 @@ create_buffer :: proc "c" (
     }
 
     switch buffer.type {
-    case BufferType.Vao:
+    case types.BufferType.Vao:
         gl.GenVertexArrays(1, &buffer.id);
         break;
-    case BufferType.Framebuffer:
+    case types.BufferType.Framebuffer:
         gl.GenFramebuffers(1, &buffer.id);
         break;
-    case BufferType.Vbo:
+    case types.BufferType.Vbo:
         gl.GenBuffers(1, &buffer.id);
     case:
         panic("Unimplemented");
     }
 
     fmt.println("Done");
-    return buffer, BufferError.None;
+    return buffer, types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 destroy_buffer :: proc "c" (buffer: ^types.Buffer, indent: string = "  ") -> types.BufferError {
-    using types;
-
     context = runtime.default_context();
 
     fmt.printf("\n[INFO]:{}| Destroying buffer of type '{}' ('') ... ", indent, utils.into_str(buffer));
@@ -106,13 +103,12 @@ destroy_buffer :: proc "c" (buffer: ^types.Buffer, indent: string = "  ") -> typ
     gl.DeleteBuffers(1, &buffer.id);
 
     fmt.print("Done");
-    return BufferError.None;
+    return types.BufferError.None;
 }
 
 // TODO: Check if it is uploaded to GPU and memset it on there as well
+@(export, link_prefix="ygg_")
 reset_buffer :: proc "c" (buffer: ^types.Buffer, indent: string = "  ") -> types.BufferError {
-    using types;
-
     context = runtime.default_context();
 
     fmt.printf("\n[INFO]:{}| Resetting buffer ({}) ... ", indent, utils.into_str(buffer));
@@ -120,21 +116,20 @@ reset_buffer :: proc "c" (buffer: ^types.Buffer, indent: string = "  ") -> types
     buffer.length = 0;
     buffer.count = 0;
     fmt.printfln("[INFO]:{}--- Done", indent);
-    return BufferError.None;
+    return types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 prepare_buffer :: proc "c" (
     buffer:         ^types.Buffer,
     opt_data:       types.Data = { },
     indent:         string = "  ") -> types.BufferError {
-    using types;
-
     context = runtime.default_context();
 
     fmt.printf("[INFO]:{}| Preparing {} ... ", indent, buffer.type);
 
     switch buffer.type {
-    case BufferType.Framebuffer:
+    case types.BufferType.Framebuffer:
         assert(len(buffer.attachments_opt) > 1, "Failed to prepare framebuffer {}: No attachments found. Did you forget to call 'create_framebuffer_attachments(...)'?");
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, buffer.id);
@@ -146,10 +141,10 @@ prepare_buffer :: proc "c" (
             return types.BufferError.InvalidAttachments;
         }
         break;
-    case BufferType.Vao:
+    case types.BufferType.Vao:
         gl.BindVertexArray(buffer.id);
         break;
-    case BufferType.Vbo:
+    case types.BufferType.Vbo:
         gl.BindBuffer(gl.ARRAY_BUFFER, buffer.id);
         gl.BufferData(gl.ARRAY_BUFFER, int(buffer.capacity), nil, gl.DYNAMIC_DRAW);
         break;
@@ -160,7 +155,7 @@ prepare_buffer :: proc "c" (
     if opt_data.ptr != nil {
         new_indent := strings.concatenate({ indent, "  " }, context.temp_allocator);
 
-        if err := push_data(context, buffer, opt_data, indent = new_indent); err != BufferError.None {
+        if err := push_data(context, buffer, opt_data, indent = new_indent); err != types.BufferError.None {
             restore_last_buffer_state(buffer);
             return err;
         }
@@ -170,16 +165,15 @@ prepare_buffer :: proc "c" (
 
 
     fmt.println("Done");
-    return BufferError.None;
+    return types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 grow_buffer :: proc "c" (
     ctx:        runtime.Context,
     buffer:     ^types.Buffer,
     size_bytes: u64,
     indent:     string = "  ") -> types.BufferError {
-    using types;
-
     context = ctx;
 
     fmt.printf("[INFO]:{}| Growing buffer '{}' ({}) from {} bytes to {} ... ", indent, buffer.id, buffer.type, buffer.capacity,
@@ -187,16 +181,15 @@ grow_buffer :: proc "c" (
 
     buffer.capacity += size_bytes;
     fmt.printfln("Done");
-    return BufferError.None;
+    return types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 shrink_buffer :: proc "c" (
     ctx:        runtime.Context,
     buffer:     ^types.Buffer,
     size_bytes: u64,
     indent:     string = "  ") -> types.BufferError {
-    using types;
-
     context = ctx;
 
     fmt.printf("\n[INFO]:{}| Shrinking buffer '{}' ({}) from {} bytes to {}... ", indent, buffer.id, buffer.type, buffer.capacity,
@@ -205,23 +198,22 @@ shrink_buffer :: proc "c" (
     if buffer.capacity - size_bytes < 0 {
         fmt.printf("\n[ERR]:{}--- Cannot shrink buffer: Shrink size ({}) is bigger than total capacity ({})", indent,
         size_bytes, buffer.capacity);
-        return BufferError.InvalidSize;
+        return types.BufferError.InvalidSize;
     }
 
     buffer.capacity -= size_bytes;
     fmt.printfln("[INFO]:{}--- Done", indent);
-    return BufferError.None;
+    return types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 migrate_buffer :: proc "c" (
     ctx:                runtime.Context,
     buffer:             ^types.Buffer,
     new_size_bytes:     u64,
-    from_where_bytes:   types.Option(u64) = nil,
+    from_where_bytes:   Maybe(u64) = 0,
     allocator:          mem.Allocator,
     indent:             string = "  ") -> (types.Buffer, types.Error) {
-    using types;
-
     context = ctx;
 
     fmt.printfln("[INFO]:{}| Migrating buffer {} ({}) into a new buffer ... ", indent, buffer.id, buffer.type);
@@ -229,12 +221,12 @@ migrate_buffer :: proc "c" (
     if new_size_bytes == buffer.capacity {
         fmt.printfln("[ERR]:{}--- Cannot migrate buffer {}: Original buffer size is the same as new one, skipping migration",
         indent, buffer.id);
-        return { }, BufferError.InvalidSize;
+        return { }, types.BufferError.InvalidSize;
     }
 
     new_indent := strings.concatenate({ indent, "  " }, allocator);
     dest_buffer, error := create_buffer(buffer.type, new_size_bytes, new_indent);
-    if error != BufferError.None {
+    if error != types.BufferError.None {
         return { }, error;
     }
 
@@ -243,17 +235,16 @@ migrate_buffer :: proc "c" (
     gl.CopyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, int(utils.unwrap_or(from_where_bytes, 0)), 0, int(buffer.length));
 
     fmt.printfln("[INFO]:{}--- Done", indent);
-    return dest_buffer, BufferError.None;
+    return dest_buffer, types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 push_data :: proc "c" (
     ctx:              runtime.Context,
     buffer:           ^types.Buffer,
     data:             types.Data,
-    from_where_bytes: types.Option(u64) = nil,
+    from_where_bytes: Maybe(u64) = 0,
     indent:           string = "  ") -> types.BufferError {
-    using types;
-
     context = ctx;
 
     original_size := buffer.capacity;
@@ -267,7 +258,7 @@ push_data :: proc "c" (
         new_indent, err := strings.concatenate({indent, "  "}, context.temp_allocator);
         assert(err == mem.Allocator_Error.None, "[ERR]:\tCannot push data: Out of memory (buy more ram)");
 
-        if err := grow_buffer(context, buffer, size_bytes, new_indent); err != BufferError.None {
+        if err := grow_buffer(context, buffer, size_bytes, new_indent); err != types.BufferError.None {
             return err;
         }
     }
@@ -284,18 +275,17 @@ push_data :: proc "c" (
     } else {
         fmt.printfln("Done ({}/{})", buffer.length, buffer.capacity);
     }
-    return BufferError.None;
+    return types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 pop_data :: proc "c" (
     ctx:              runtime.Context,
     buffer:           ^types.Buffer,
     size_bytes:       u64,
     count:            u64,
-    from_where_bytes: types.Option(u64) = nil,
+    from_where_bytes: Maybe(u64) = 0,
     indent:           string = "  ") -> (types.Data, types.Error) {
-    using types;
-
     context = ctx;
 
     from_where := utils.unwrap_or(from_where_bytes, buffer.length);
@@ -304,7 +294,7 @@ pop_data :: proc "c" (
     if buffer.length - size_bytes < 0 {
         fmt.printfln("\n[ERR]:{}--- Cannot pop data from buffer: Bytes requested ({}) would underflow the buffer's capacity ({}). ",
         indent, size_bytes, buffer.capacity);
-        return { }, BufferError.InvalidSize;
+        return { }, types.BufferError.InvalidSize;
     }
 
     get_data : rawptr;
@@ -317,30 +307,25 @@ pop_data :: proc "c" (
     buffer.length -= size_bytes;
     buffer.count -= count;
     fmt.println("Done");
-    return Data{ ptr = get_data, count = count, size = size_bytes }, BufferError.None;
+    return types.Data{ ptr = get_data, count = count, size = size_bytes }, types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 push_text :: proc "c" (
-    ctx:    runtime.Context,
+    ctx:    ^types.Context,
     text:   ^types.Node,
     indent: string = "  ") -> types.Error {
-    using types;
-
-    context = ctx;
-
-    assert(context.user_ptr != nil, "[ERR]:\tCannot push text: Context is nil. Did you forget to call 'create_context' " +
-    "or to set context.user_ptr to '&ctx' ?");
-    ctx := cast(^Context)context.user_ptr;
+    context = ctx._context;
     if ctx == nil || ctx.renderer == nil {
         fmt.eprintfln("[ERR]:{} --- Cannot push text: No renderer found or is nil. Did you forget to call 'create_renderer' ?",
         indent);
-        return BufferError.InvalidRenderer;
+        return types.BufferError.InvalidRenderer;
     }
 
-    data: ^Data = cast(^Data)text.user_data;
+    data: ^types.Data = cast(^types.Data)text.user_data;
     if data == nil {
         fmt.printfln("[WARN]:{}--- Cannot push text: No data found in text node, skipping ...");
-        return BufferError.InvalidPtr;
+        return types.BufferError.InvalidPtr;
     }
 
     if err := push_data(context, &ctx.renderer.pipeline.vbo, data^, indent = indent); err != nil {
@@ -350,30 +335,25 @@ push_text :: proc "c" (
 
     // TODO: Pack node styling and properties into appropriate uniforms and vertex data to pass to shader later on.
 
-    return BufferError.None;
+    return types.BufferError.None;
 }
 
+@(export, link_prefix="ygg_")
 push_box :: proc "c" (
-    ctx:    runtime.Context,
+    ctx:    ^types.Context,
     box:    ^types.Node,
     indent: string = "  ") -> types.Error {
-    using types;
-
-    context = ctx;
-
-    assert(context.user_ptr != nil, "[ERR]:\tCannot push box: Context is nil. Did you forget to call 'create_context' " +
-    "or to set context.user_ptr to '&ctx' ?");
-    ctx := cast(^Context)context.user_ptr;
+    context = ctx._context;
     if ctx == nil || ctx.renderer == nil {
         fmt.eprintfln("[ERR]:{} --- Cannot push box: No renderer found or is nil. Did you forget to call 'create_renderer' ?",
             indent);
-        return BufferError.InvalidRenderer;
+        return types.BufferError.InvalidRenderer;
     }
 
-    data: ^Data = cast(^Data)box.user_data;
+    data: ^types.Data = cast(^types.Data)box.user_data;
     if data == nil {
         fmt.printfln("[WARN]:{}--- Cannot push text: No data found in text node, skipping ...");
-        return BufferError.InvalidPtr;
+        return types.BufferError.InvalidPtr;
     }
 
     if err := push_data(context, &ctx.renderer.pipeline.vbo, data^, indent = indent); err != nil {
@@ -383,38 +363,40 @@ push_box :: proc "c" (
 
     // TODO: Pack node styling and properties into appropriate uniforms and vertex data to pass to shader later on.
 
-    return BufferError.None;
+    return types.BufferError.None;
 }
 
-push_img :: proc "c" (ctx: runtime.Context, img: ^types.Node, indent: string = "  ") -> types.Error {
+@(export, link_prefix="ygg_")
+push_img :: proc "c" (ctx: ^types.Context, img: ^types.Node, indent: string = "  ") -> types.Error {
     panic_contextless("Unimplemented");
 }
 
-push_node :: proc "c" (ctx: runtime.Context, custom_node: ^types.Node, indent: string = "  ") -> types.Error {
+@(export, link_prefix="ygg_")
+push_node :: proc "c" (ctx: ^types.Context, custom_node: ^types.Node, indent: string = "  ") -> types.Error {
     panic_contextless("Unimplemented");
 }
 
+@(export, link_prefix="ygg_")
 restore_last_buffer_state :: proc "c" (current_buffer: ^types.Buffer) {
-    using types;
-
     switch current_buffer.type {
-    case BufferType.Vao:
+    case types.BufferType.Vao:
         last_vao, exists := get_last_vao();
         if exists {
             gl.BindVertexArray(last_vao);
         }
-    case BufferType.Vbo:
+    case types.BufferType.Vbo:
         last_vbo, exists := get_last_vbo();
         if exists {
             gl.BindBuffer(gl.ARRAY_BUFFER, last_vbo);
         }
-    case BufferType.Framebuffer:
+    case types.BufferType.Framebuffer:
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0);
     case:
         panic_contextless("Unimplemented");
     }
 }
 
+@(export, link_prefix="ygg_")
 get_last_vao :: proc "c" () -> (u32, bool) {
     vao_id : i32 = 0;
 
@@ -426,6 +408,7 @@ get_last_vao :: proc "c" () -> (u32, bool) {
     return u32(vao_id), true;
 }
 
+@(export, link_prefix="ygg_")
 get_last_vbo :: proc "c" () -> (u32, bool) {
     vbo_id : i32 = 0;
 
@@ -437,6 +420,7 @@ get_last_vbo :: proc "c" () -> (u32, bool) {
     return u32(vbo_id), true;
 }
 
+@(export, link_prefix="ygg_")
 get_last_texture :: proc "c" () -> (u32, bool) {
     texture_id: i32 = 0;
 
@@ -448,14 +432,12 @@ get_last_texture :: proc "c" () -> (u32, bool) {
     return u32(texture_id), true;
 }
 
+@(export, link_prefix="ygg_")
 _into_gl_type :: proc "c" (buffer_type: types.BufferType) -> u32 {
-    using types;
-
     switch buffer_type {
-    case BufferType.Framebuffer:    return gl.FRAMEBUFFER;
-    case BufferType.Vbo:            return gl.ARRAY_BUFFER;
-    case BufferType.Vao:            return gl.VERTEX_ARRAY;
+    case types.BufferType.Framebuffer:    return gl.FRAMEBUFFER;
+    case types.BufferType.Vbo:            return gl.ARRAY_BUFFER;
+    case types.BufferType.Vao:            return gl.VERTEX_ARRAY;
     case: panic_contextless("Unimplemented");
     }
 }
-

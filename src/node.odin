@@ -27,32 +27,28 @@ import utils "utils";
 //                      (alt, disabled, type, etc...), which will mutate the node's functionality.
 // @param children:     The leaf nodes related under this one,
 // @return              An error if one is encountered and the node created.
+@(export, link_prefix="ygg_", require_results)
 create_node :: proc "c" (
-    ctx:        runtime.Context,
+    ctx:        ^types.Context,
     tag:        string,
-    id:         types.Option(int) = nil,
+    id:         Maybe(int) = nil,
     parent:     ^types.Node = nil,
-    style:      map[string]types.Option(string) = { },
+    style:      map[string]Maybe(string) = { },
     children:   map[types.Id]types.Node = { },
     user_data:  rawptr = nil,
-    indent:     string = "  ") -> types.Node {
-    using types;
-    using utils;
+    indent:     cstring = "  ") -> types.Node {
+    assert_contextless(ctx != nil, "[ERR]:\tCannot create node: Context is nil. Did you forget to call 'create_context(...)' ?");
+    context = ctx^._context;
 
-    context = ctx;
-
-    ygg_ctx := cast(^Context)ctx.user_ptr;
-    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot create node: Context is nil. Did you forget to call 'create_context(...)' ?");
-
-    level : LogLevel = into_debug(ygg_ctx.config["log_level"]);
-    if level >= LogLevel.Verbose {
+    level: types.LogLevel = ctx.log_level;
+    if level >= types.LogLevel.Verbose {
         fmt.printf("[INFO]:{}| Creating node ({{ tag = '{}', id = {}, parent?: '{}' [{}] (%p)}}) ...", indent, tag, id,
         parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0, parent);
     }
 
-    parent_node     := parent != nil ? parent : ygg_ctx.last_node;
-    new_id: int     = unwrap_or(id, 0);
-    will_overflow   := check_id_overflow(new_id);
+    parent_node     := parent != nil ? parent : ctx.last_node;
+    new_id: int     = utils.unwrap_or(id, 0);
+    will_overflow   := utils.check_id_overflow(new_id);
 
     if will_overflow {
         fmt.printfln("[WARN]:{}| Node with ID [{}] will overflow if attached to tree! " +
@@ -60,13 +56,13 @@ create_node :: proc "c" (
         indent, new_id);
     }
 
-    if !is_some(id) && parent_node != nil {
-        new_id = int(parent_node.id + Id(len(parent_node.children) + 1));
+    if utils.is_none(id) && parent_node != nil {
+        new_id = int(parent_node.id + types.Id(len(parent_node.children) + 1));
     }
 
-    return Node {
+    return types.Node {
         parent = parent_node,
-        id = Id(new_id),
+        id = types.Id(new_id),
         tag = tag,
         children = children,
         style = style,
@@ -75,39 +71,36 @@ create_node :: proc "c" (
 }
 
 // Deallocate a leaf and all of its children
+@(export, link_prefix="ygg_")
 destroy_node :: proc "c" (
-    ctx: runtime.Context,
-    id: types.Id,
-    indent: string = "  ") -> types.Option(^types.Node) {
-    using types;
-    using utils;
+    ctx:    ^types.Context,
+    id:     types.Id,
+    indent: cstring = "  ") -> Maybe(types.Node) {
+    assert_contextless(ctx != nil, "[ERR]:\tCannot destroy node: Context is nil. Did you forget to call 'create_context(...)' ?");
+    context = ctx^._context;
 
-
-    context = ctx;
-    ygg_ctx := cast(^types.Context)ctx.user_ptr;
-    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot destroy node: Context is nil. Did you forget to call 'create_context(...)' ?");
-
-    level : LogLevel = into_debug(ygg_ctx.config["log_level"]);
-    if level >= LogLevel.Verbose {
+    level: types.LogLevel = ctx.log_level;
+    if level >= types.LogLevel.Verbose {
         fmt.printfln("[INFO]:{}| Destroying node [{}] ...", indent, id);
     }
 
-    new_indent, err := strings.concatenate({indent, "  "}, context.temp_allocator);
+    new_indent, err := strings.concatenate({string(indent), "  "}, context.temp_allocator);
+    c_indent := cstring(raw_data(new_indent));
     if err != mem.Allocator_Error.None {
         fmt.eprintfln("[ERR]:{} --- Cannot destroy node: Alloc error: {}", indent, err);
         panic("Alloc error (Buy more ram)");
     }
 
-    node_ptr := find_node(ctx, id, new_indent);
+    node_ptr := find_node(ctx, id, c_indent);
 
     if node_ptr == nil {
-        if level >= LogLevel.Normal {
+        if level >= types.LogLevel.Normal {
             fmt.eprintfln("[ERR]:{} --- Error destroying node: Node [{}] not found", indent, id);
         }
-        return utils.none(^Node);
+        return nil;
     }
 
-    nodes_to_delete_ordered := flatten_node(node_ptr, allocator = context.temp_allocator);
+    nodes_to_delete_ordered := flatten_nodes(node_ptr, allocator = context.temp_allocator);
 
     // Reverse the list to get the correct post-order traversal.
     // This ensures we process children before their parents.
@@ -141,11 +134,11 @@ destroy_node :: proc "c" (
         }
     }
 
-    if level >= LogLevel.Verbose {
+    if level >= types.LogLevel.Verbose {
         fmt.printfln("[INFO]:{}--- Done", indent);
     }
 
-    return utils.some(node_ptr);
+    return node_ptr^;
 }
 
 // Low-level API to attach a node to the current ui tree. Benefit of this function over its high-level counterparts
@@ -156,74 +149,71 @@ destroy_node :: proc "c" (
 //
 // @param ctx:    The current tree where we want to attach this node to.
 // @param node:   Which node is to be added to the tree
+@(export, link_prefix="ygg_")
 attach_node :: proc "c" (
-    ctx:    runtime.Context,
+    ctx:    ^types.Context,
     node:   types.Node,
-    indent: string = "  ") {
-    using types;
-    using utils;
+    indent: cstring = "  ") {
+    assert_contextless(ctx != nil, "[ERR]:\tCannot attach node: Context is nil. Did you forget to call 'create_context(...)' ?");
+    context = ctx._context;
 
-
-    context = ctx;
-    ygg_ctx := cast(^types.Context)ctx.user_ptr;
-    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot attach node: Context is nil. Did you forget to call 'create_context(...)' ?");
-
-    level : LogLevel = into_debug(ygg_ctx.config["log_level"]);
-
-    parent_ptr : ^Node = node.parent != nil ? node.parent : ygg_ctx.last_node;
-    new_node   : Node  = node;
+    level: types.LogLevel = ctx.log_level;
+    parent_ptr : ^types.Node = node.parent != nil ? node.parent : ctx.last_node;
+    new_node   : types.Node  = node;
     mem_err: mem.Allocator_Error;
 
-    if level >= LogLevel.Verbose {
+    if level >= types.LogLevel.Verbose {
         fmt.printfln("[INFO]:{}| Attaching node [tag = '{}', id = {} under '{}'] ...", indent, node.tag, node.id,
         parent_ptr != nil ? parent_ptr.tag : "nil");
     }
 
     if parent_ptr == nil {
-        ygg_ctx.root, mem_err = new_clone(node, ctx.allocator);
+        ctx.root, mem_err = new_clone(node);
         assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
-        new_node   = ygg_ctx.root^;
-        ygg_ctx.last_node = ygg_ctx.root;
+        new_node   = ctx.root^;
+        ctx.last_node = ctx.root;
 
-    } else if ygg_ctx.last_node != parent_ptr {
-        new_indent, mem_error := strings.concatenate({indent, "  "}, context.temp_allocator);
+    } else if ctx.last_node != parent_ptr {
+        new_indent, mem_error := strings.concatenate({string(indent), "  "}, context.temp_allocator);
+        c_indent := cstring(raw_data(new_indent));
         assert(mem_error == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
 
-        parent_ptr = find_node(ctx, parent_ptr.id, new_indent);
+        parent_ptr = find_node(ctx, parent_ptr.id, c_indent);
 
         if parent_ptr == nil {
-            if level >= LogLevel.Normal {
+            if level >= types.LogLevel.Normal {
                 fmt.eprintfln("[WARN]:{}--- Node parent is nil, attaching to root instead ...", indent);
             }
 
-            parent_ptr = ygg_ctx.root;
+            parent_ptr = ctx.root;
         }
     }
 
     if parent_ptr != nil && new_node.id == parent_ptr.id {
         fmt.printfln("[WARN]:{}| Overwriting root, setting '{}' as new root ...", indent, node.tag);
-        free(ygg_ctx.root, ctx.allocator);
-        ygg_ctx.root, mem_err = new_clone(new_node, ctx.allocator);
+        free(ctx.root);
+        ctx.root, mem_err = new_clone(new_node);
         assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
 
-        ygg_ctx.last_node = ygg_ctx.root;
+        ctx.last_node = ctx.root;
     } else {
         new_node.parent = parent_ptr;
         if parent_ptr != nil {
             parent_ptr.children[node.id] = new_node;
-            ygg_ctx.last_node = &parent_ptr.children[node.id];
+            ctx.last_node = &parent_ptr.children[node.id];
         }
     }
 
-    if level >= LogLevel.Verbose {
-        new_indent, mem_error := strings.concatenate({indent, "  "}, context.temp_allocator);
+    if level >= types.LogLevel.Verbose {
+        new_indent, mem_error := strings.concatenate({string(indent), "  "}, context.temp_allocator);
+        c_indent := cstring(raw_data(new_indent));
         assert(mem_error == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
 
         if parent_ptr != nil {
-            print_nodes(parent_ptr, new_indent);
+            print_nodes(parent_ptr, c_indent);
         }
 
-        fmt.printfln("[INFO]:{}--- Done (%p)", indent, ygg_ctx.last_node);
+        fmt.printfln("[INFO]:{}--- Done (%p)", indent, ctx.last_node);
     }
 }
 
@@ -235,31 +225,29 @@ attach_node :: proc "c" (
 //
 // @param   *ctx*:    The current tree where we want to attach this node to.
 // @param   *node*:   Which node is to be added to the tree
+@(export, link_prefix="ygg_")
 detach_node :: proc "c" (
-    ctx: runtime.Context,
-    id: types.Id,
-    indent: string = "  ") -> types.Option(^types.Node) {
-    using types;
-    using utils;
+    ctx:    ^types.Context,
+    id:     types.Id,
+    indent: cstring = "  ") -> Maybe(types.Node) {
+    assert_contextless(ctx != nil, "[ERR]:\tCannot detach node: Context is nil. Did you forget to call 'create_context(...)' ?");
+    context = ctx._context;
 
-    context = ctx;
-    ygg_ctx: ^Context = cast(^Context)ctx.user_ptr;
-    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot detach node: Context is nil. Did you forget to call 'create_context(...)' ?");
-
-    level : LogLevel = into_debug(ygg_ctx.config["log_level"]);
-    if level >= LogLevel.Verbose {
+    level: types.LogLevel = ctx.log_level;
+    if level >= types.LogLevel.Verbose {
         fmt.printfln("[INFO]:{}| Detaching [{}] from context tree ...", indent, id);
     }
 
-    new_indent, err := strings.concatenate({ indent, "  " }, context.temp_allocator);
+    new_indent, err := strings.concatenate({ string(indent), "  " }, context.temp_allocator);
     if err != mem.Allocator_Error.None {
         fmt.eprintfln("[ERR]:{} --- Error detaching [{}] from context tree:", indent, id, err);
-        return none(^Node);
+        return nil;
     }
 
-    node_ptr := destroy_node(ctx, id, indent = new_indent);
+    c_indent := cstring(raw_data(new_indent));
+    node_ptr := destroy_node(ctx, id, indent = c_indent);
 
-    if level >= LogLevel.Verbose {
+    if level >= types.LogLevel.Verbose {
         fmt.printfln("[INFO]:{}--- Done", indent);
     }
 
@@ -279,96 +267,88 @@ find_node :: proc {
 // @param   id:     The node ID you are looking for.
 // @param   indent: The level of indent for all logs inside this function, open for fine-tuning.
 // @return  Nil if the node was not found, the pointer to the node within the tree otherwise.
+@(export, link_prefix="ygg_")
 find_node_with_id :: proc "c" (
-    ctx:    runtime.Context,
+    ctx:    ^types.Context,
     id:     types.Id,
-    indent: string = "  ") -> ^types.Node {
-    using types;
+    indent: cstring = "  ") -> ^types.Node {
+    assert_contextless(ctx != nil, "[ERR]:\tCannot find node: Context is nil. Did you forget to call 'create_context(...)' ?");
+    context = ctx._context;
 
-
-    context = ctx;
-    ygg_ctx := cast(^Context)ctx.user_ptr;
-    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot find node: Context is nil. Did you forget to call 'create_context(...)' ?");
-
-    log_level := utils.into_debug(ygg_ctx.config["log_level"]);
-
-    if log_level >= LogLevel.Verbose {
+    level: types.LogLevel = ctx.log_level;
+    if level >= types.LogLevel.Verbose {
         fmt.printf("[INFO]:{}| Searching for node id [{}] in context tree ...", indent, id);
     }
 
-    if ygg_ctx.root == nil {
-        if log_level >= LogLevel.Verbose {
+    if ctx.root == nil {
+        if level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
-        return ygg_ctx.root;
+        return ctx.root;
     }
 
-    if id == ygg_ctx.root.id {
-        if log_level >= LogLevel.Verbose {
+    if id == ctx.root.id {
+        if level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
 
-        return ygg_ctx.root;
+        return ctx.root;
     }
 
-    node_ptr := flatten_and_find_node(ygg_ctx.root, id = id, allocator = context.temp_allocator);
+    node_ptr := flatten_and_find_node(ctx.root, id = id, allocator = context.temp_allocator);
 
     if node_ptr != nil && node_ptr.id == id {
-        if log_level >= LogLevel.Verbose {
+        if level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
         return node_ptr;
     }
 
-    if log_level >= LogLevel.Verbose {
+    if level >= types.LogLevel.Verbose {
         fmt.printfln("\n[WARN]:{}--- Node not found", indent);
     }
 
     return nil;
 }
 
+@(export, link_prefix="ygg_")
 find_node_with_tag :: proc "c" (
-    ctx:    runtime.Context,
+    ctx:    ^types.Context,
     tag:    string,
-    indent: string = "  ") -> ^types.Node {
-    using types;
+    indent: cstring = "  ") -> ^types.Node {
+    assert_contextless(ctx != nil, "[ERR]:\tCannot create node: Context is nil. Did you forget to call 'create_context(...)' ?");
+    context = ctx._context;
 
-
-    context = ctx;
-    ygg_ctx := cast(^Context)ctx.user_ptr;
-    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot create node: Context is nil. Did you forget to call 'create_context(...)' ?");
-
-    log_level := utils.into_debug(ygg_ctx.config["log_level"]);
-
-    if log_level >= LogLevel.Verbose {
+    level: types.LogLevel = ctx.log_level;
+    if level >= types.LogLevel.Verbose {
         fmt.printf("[INFO]:{}| Searching for node id '{}' in context tree ...", indent, tag);
     }
 
-    if ygg_ctx.root == nil {
-        if log_level >= LogLevel.Verbose {
+    if ctx.root == nil {
+        if level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
-        return ygg_ctx.root;
+        return ctx.root;
     }
 
-    if tag == ygg_ctx.root.tag {
-        if log_level >= LogLevel.Verbose {
+    if tag == ctx.root.tag {
+        if level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
 
-        return ygg_ctx.root;
+        return ctx.root;
     }
 
-    node_ptr := flatten_and_find_node(ygg_ctx.root, tag = tag, allocator = context.temp_allocator);
+    node_ptr := flatten_and_find_node(ctx.root, tag = tag, allocator = context.temp_allocator);
 
     if node_ptr != nil && node_ptr.tag == tag {
-        if log_level >= LogLevel.Verbose {
+        if level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
         return node_ptr;
     }
 
-    if log_level >= LogLevel.Verbose {
+    if level >= types.LogLevel.Verbose {
         fmt.printfln("\n[WARN]:{}--- Node not found", indent);
     }
 
@@ -380,17 +360,16 @@ find_node_with_tag :: proc "c" (
 // @param   *root*:        A pointer that defines the start of the tree depth will be calculated from.
 // @return  The total depth of the root specified, said differently, how many nodes to go into before
 //          reaching the last inner leaf.
+@(export, link_prefix="ygg_")
 get_node_depth :: proc "c" (root: ^types.Node, allocator: mem.Allocator) -> types.Id {
-    using types;
-
     if root == nil {
         return 0;
     }
 
     context = runtime.default_context();
 
-    flat_nodes := flatten_node(root, allocator = allocator);
-    different_ids := make(map[^Node]bool, allocator = allocator);
+    flat_nodes := flatten_nodes(root, allocator = allocator);
+    different_ids := make(map[^types.Node]bool, allocator = allocator);
 
     for node in flat_nodes {
         if node != nil && node != root {
@@ -400,7 +379,7 @@ get_node_depth :: proc "c" (root: ^types.Node, allocator: mem.Allocator) -> type
         }
     }
 
-    return Id(len(different_ids));
+    return types.Id(len(different_ids));
 }
 
 // Core API to flatten all map nodes into a single dynamic sorted array, useful when you need to apply some
@@ -409,22 +388,20 @@ get_node_depth :: proc "c" (root: ^types.Node, allocator: mem.Allocator) -> type
 // @param   *node_ptr*:     Which node to flatten with its children.
 // @param   *stop_at*:      An ID that will stop the flattening process to act as an end bound.
 // @return  The flattened list containing the node provided and all of its children.
-flatten_node :: proc "c" (
-    start_ptr: ^types.Node,
-    stop_at: types.Option(types.Id) = nil,
-    allocator: mem.Allocator) -> [dynamic]^types.Node {
-    using types;
-    using utils;
-
+@(export, link_prefix="ygg_")
+flatten_nodes :: proc "c" (
+    start_ptr:  ^types.Node,
+    stop_at:    Maybe(types.Id) = {},
+    allocator:  mem.Allocator) -> [dynamic]^types.Node {
     context = runtime.default_context();
 
-    end_bound: Id = unwrap_or(stop_at, Id(get_max_number(Id)));
+    end_bound: types.Id = utils.unwrap_or(stop_at, types.Id(utils.get_max_number(types.Id)));
 
     // Stack for DFS traversal, implemented with a dynamic array.
-    to_visit := make([dynamic]^Node, allocator = allocator);
+    to_visit := make([dynamic]^types.Node, allocator = allocator);
 
     // Flatten map to store the nodes in post-order (children first).
-    flat_nodes := make([dynamic]^Node, allocator = allocator);
+    flat_nodes := make([dynamic]^types.Node, allocator = allocator);
 
     append(&to_visit, start_ptr);
 
@@ -451,20 +428,18 @@ flatten_and_find_node :: proc {
 // @param   *start_ptr*:    Which node to flatten.
 // @param   *find*:         ID to find when flattening nodes and once found, stop the flattening process.
 // @return  The node to find (nil if not found).
+@(export, link_prefix="ygg_")
 flatten_and_find_node_with_id :: proc "c" (
     start_ptr: ^types.Node,
     id: types.Id,
     allocator: mem.Allocator) -> ^types.Node {
-    using types;
-
     context = runtime.default_context();
     context.temp_allocator = allocator;
 
     // Stack for DFS traversal, implemented with a dynamic array.
-    to_visit := make([dynamic]^Node, allocator);
-
+    to_visit := make([dynamic]^types.Node, allocator);
     // Flatten map to store the nodes in post-order (children first).
-    flat_nodes := make([dynamic]^Node, allocator);
+    flat_nodes := make([dynamic]^types.Node, allocator);
     append_elem(&to_visit, start_ptr);
 
     // Dynamically grow the flat list of nodes, and only stop when all inner nodes have been explored.
@@ -488,20 +463,19 @@ flatten_and_find_node_with_id :: proc "c" (
 // @param   *start_ptr*:    Which node to flatten.
 // @param   *find*:         Tag to find when flattening nodes and once found, stop the flattening process.
 // @return  The node to find (nil if not found).
+@(export, link_prefix="ygg_")
 flatten_and_find_node_with_tag :: proc "c" (
     start_ptr: ^types.Node,
     tag: string,
     allocator: mem.Allocator) -> ^types.Node {
-    using types;
-
     context = runtime.default_context();
     context.temp_allocator = allocator;
 
     // Stack for DFS traversal, implemented with a dynamic array.
-    to_visit := make([dynamic]^Node, allocator);
+    to_visit := make([dynamic]^types.Node, allocator);
 
     // Flatten map to store the nodes in post-order (children first).
-    flat_nodes := make([dynamic]^Node, allocator);
+    flat_nodes := make([dynamic]^types.Node, allocator);
     append(&to_visit, start_ptr);
 
     // Dynamically grow the flat list of nodes, and only stop when all inner nodes have been explored.

@@ -3,12 +3,12 @@ package types;
 import "vendor:glfw";
 
 Window :: struct {
-    glfw_handle:    glfw.WindowHandle,
-    title:          string,
-    dimensions:     Dimension,
-    refresh_rate:   Option(u16),
-    offset:         Dimension,
-    gl_version:     [2]i32
+    glfw_handle:        glfw.WindowHandle,
+    title:              cstring,
+    width, height:      u32,
+    offset:             [2]Dimension,
+    gl_version:         [2]u8,
+    refresh_rate_opt:   u16,
 }
 
 WindowError :: enum u8 {

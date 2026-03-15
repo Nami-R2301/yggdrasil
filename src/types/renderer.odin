@@ -1,7 +1,5 @@
 package types;
 
-import queue "core:container/queue";
-
 Program :: u32;
 
 ProgramError :: enum u8 {
@@ -11,7 +9,6 @@ ProgramError :: enum u8 {
 }
 
 Renderer :: struct {
-  node_queue:   queue.Queue(Node),
   textures:     [dynamic]Buffer,
   pipeline:     BufferPipeline,
   state:        RendererState,

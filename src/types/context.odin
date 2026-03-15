@@ -1,8 +1,8 @@
 package types;
 
-import queue "core:container/queue";
-import vmem  "core:mem/virtual";
-import mem   "core:mem";
+import queue    "core:container/queue";
+import vmem     "core:mem/virtual";
+import runtime  "base:runtime";
 
 // NOTE: The u16 encoding limit for IDs is a deliberate choice, since I deemed this library far too unoptimized to 
 // even fathom having more that 2^16 nodes in a tree at a time. Main bottlenecks here are searching and dispatching
@@ -11,7 +11,7 @@ import mem   "core:mem";
 // type aliasing in case this needed to be changed.
 Id :: u16;
 
-Dimension :: [2]u32;
+Dimension :: u32;
 
 // Main data related to a tree used for keeping nodes of data either for rendering to a window or passing it to a vbo.
 //
@@ -19,16 +19,17 @@ Dimension :: [2]u32;
 // the assignment of IDs to your nodes is order sensitive and if you encounter misordering or certain nodes being 
 // prioritized over others, you might have a non-ascending ID causing this.
 Context :: struct {
+  renderer:     ^Renderer,
   window:       ^Window,
   root:         ^Node,
   last_node:    ^Node,
-  renderer:     ^Renderer,
   node_pairs:   queue.Queue(Node),
+  log_level:    LogLevel,
   config:       map[string]string,
-  cursor:       Dimension,
+  cursor:       [2]Dimension,
   primary_font: Font,
-  _arena:     ^vmem.Arena, // The physical memory manager
-  allocator:  mem.Allocator,  // Allow custom allocators
+  _context:     runtime.Context,  // Odin's context with allocators
+  _arena:       ^vmem.Arena, // The physical memory manager
 }
 
 // Errors regarding the overall app context.

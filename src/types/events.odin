@@ -11,7 +11,7 @@ Event :: union {
 // Used for handling mouse click, hover, drag, and release events on UI elements rendered.
 // Every UI element will be mapped to a box, used for mouse drag, and hover event dispatching.
 MouseEvent :: struct {
-  button:  Option(c.int),  // GLFW code.
+  button:  Maybe(c.int),  // GLFW code.
   origin:  Dimension,
   end:     Dimension,
   width:   u16,

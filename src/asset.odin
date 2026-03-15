@@ -1,24 +1,22 @@
 package ygg;
 
 import fmt      "core:fmt";
-import os       "core:os";
+import os       "core:os/os2";
 import mem      "core:mem";
 import runtime  "base:runtime";
 
 import ttf      "vendor:stb/truetype";
 import gl       "vendor:OpenGL";
 
-import types "types";
+import types    "types";
 
+@(export, link_prefix="ygg_")
 init_font :: proc "c" (
-    ygg_ctx:        ^types.Context,
-    font_name:  string = "./res/fonts/default/JetBrainsMono-Regular.ttf",
-    indent:     string = "  ") -> types.Error {
-    using types;
-
-    assert_contextless(ygg_ctx != nil, "[ERR]:\tCannot init font: Context is nil");
-
-    font := load_font(font_name, indent, ygg_ctx.allocator);
+    ctx:        ^types.Context,
+    font_name:  cstring = "./res/fonts/default/JetBrainsMono-Regular.ttf",
+    indent:     cstring = "  ") -> types.Error {
+    assert_contextless(ctx != nil, "[ERR]:\tCannot init font: Context is nil");
+    font := load_font(font_name, indent, ctx._context.allocator);
 
     // Bake the letters ' ' (32) through '~' (126) into the bitmap
     // This fills 'font_bitmap' with pixels and 'cdata' with coordinate info
@@ -41,21 +39,20 @@ init_font :: proc "c" (
     gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RED, 512, 512, 0, gl.RED, gl.UNSIGNED_BYTE, raw_data(font.font_bitmap[:]));
     gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 
-    ygg_ctx.primary_font = font;
-    return FontError.None;
+    ctx.primary_font = font;
+    return types.FontError.None;
 }
 
+@(export, link_prefix="ygg_")
 load_font :: proc "c" (
-    path: string,
-    indent: string = "  ",
-    allocator: mem.Allocator) -> types.Font {
-    using types;
-
+    path:       cstring,
+    indent:     cstring = "  ",
+    allocator:  mem.Allocator) -> types.Font {
     context = runtime.default_context();
 
     fmt.printf("[INFO]:{}| Loading font file {} ... ", indent, path);
-    bytes, err := os.read_entire_file_from_filename_or_err(path, allocator);
-    if err != 0 {
+    bytes, err := os.read_entire_file_from_path(string(path), allocator);
+    if err != runtime.Allocator_Error.None {
         fmt.eprintfln("[ERR]:{} --- Cannot load font file {}: {}", indent, path, err);
         panic("Invalid font file");
     }
@@ -66,7 +63,7 @@ load_font :: proc "c" (
         panic("Invalid font file");
     }
 
-    font := Font{
+    font := types.Font{
         width_pixels = 16,
         height_pixels = 16,
         bytes = bytes,
@@ -98,9 +95,7 @@ create_glyphs :: proc(
     x_start:    f32,
     y_start:    f32,
     allocator:  mem.Allocator = context.allocator) -> [dynamic]types.Vertex {
-    using types;
-
-    vertices := make([dynamic]Vertex, allocator = allocator);
+    vertices := make([dynamic]types.Vertex, allocator = allocator);
 
     x := x_start;
     y := y_start;
@@ -114,10 +109,10 @@ create_glyphs :: proc(
         ttf.GetBakedQuad(raw_data(font.cdata[:]), 512, 512, i32(r) - 32, &x, &y, &q, b32(1));
 
         // Strip Order: BL -> BR -> TL -> TR
-        v_bl := Vertex{ entity_id = entity_id, position = { q.x0, q.y0, pack_uv(q.s0, q.t0)} };
-        v_br := Vertex{ entity_id = entity_id, position = { q.x1, q.y0, pack_uv(q.s1, q.t0)} };
-        v_tl := Vertex{ entity_id = entity_id, position = { q.x0, q.y1, pack_uv(q.s0, q.t1)} };
-        v_tr := Vertex{ entity_id = entity_id, position = { q.x1, q.y1, pack_uv(q.s1, q.t1)} };
+        v_bl := types.Vertex{ entity_id = entity_id, position = { q.x0, q.y0, pack_uv(q.s0, q.t0)} };
+        v_br := types.Vertex{ entity_id = entity_id, position = { q.x1, q.y0, pack_uv(q.s1, q.t0)} };
+        v_tl := types.Vertex{ entity_id = entity_id, position = { q.x0, q.y1, pack_uv(q.s0, q.t1)} };
+        v_tr := types.Vertex{ entity_id = entity_id, position = { q.x1, q.y1, pack_uv(q.s1, q.t1)} };
 
         if !first_char {
         // Repeat the LAST vertex of the previous quad

@@ -4,7 +4,7 @@ import mem     "core:mem";
 import runtime "base:runtime";
 import math    "core:math";
 
-import types "../types";
+import types   "../types";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -12,6 +12,7 @@ import types "../types";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+@(export, link_prefix="ygg_utils_", require_results)
 temp_alloc :: proc() -> mem.Arena {
     buffer: [1024]byte
     arena: mem.Arena;
@@ -25,6 +26,7 @@ temp_alloc :: proc() -> mem.Arena {
 //
 // @param   Value to test overflow with current types.Id alias size.
 // @return  If the value provided would overflow with the current types.Id encoding.
+@(export, link_prefix="ygg_utils_", require_results)
 check_id_overflow :: proc(value: $T) -> bool {
     // Only unsigned.
     switch size_of(types.Id) {
@@ -42,6 +44,7 @@ check_id_overflow :: proc(value: $T) -> bool {
 //
 // @param   Type to get maximum possible value out of.
 // @return  The maximum value for that number type in float to support floats as well.
+@(export, link_prefix="ygg_utils_", require_results)
 get_max_number :: proc($T: typeid) -> f64 {
     info := runtime.__type_info_of(T);
 

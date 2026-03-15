@@ -3,7 +3,6 @@ package utils;
 import "vendor:glfw";
 
 import "../types";
-import "../utils";
 
 default :: proc {
   default_bool,
@@ -15,15 +14,18 @@ default :: proc {
   default_config,
 }
 
-default_bool :: proc (value: bool) -> bool {
+@(export, link_prefix="ygg_utils_", require_results)
+default_bool :: proc "c" (value: bool) -> bool {
   return false;
 }
 
+@(export, link_prefix="ygg_utils_", require_results)
 default_str :: proc (str: string) -> string {
   return "-";
 }
 
-default_opt :: proc (opt: types.Option($T)) -> T {
+@(export, link_prefix="ygg_utils_", require_results)
+default_opt :: proc "c" (opt: Maybe($T)) -> T {
   switch v in opt {
     case types.Node: 
         return default_node(v);
@@ -40,7 +42,8 @@ default_opt :: proc (opt: types.Option($T)) -> T {
   }
 }
 
-default_node :: proc (node: types.Node) -> types.Node {
+@(export, link_prefix="ygg_utils_", require_results)
+default_node :: proc "c" (node: types.Node) -> types.Node {
   return types.Node {
     parent = nil,
     tag = "N/A",
@@ -50,7 +53,8 @@ default_node :: proc (node: types.Node) -> types.Node {
   };
 }
 
-default_ctx :: proc (ctx: types.Context) -> types.Context {
+@(export, link_prefix="ygg_utils_", require_results)
+default_ctx :: proc "c" (ctx: types.Context) -> types.Context {
   return types.Context {
     window = nil,
     root = nil,
@@ -61,25 +65,27 @@ default_ctx :: proc (ctx: types.Context) -> types.Context {
   };
 }
 
-default_log_level :: proc (log: types.LogLevel) -> types.LogLevel {
+@(export, link_prefix="ygg_utils_", require_results)
+default_log_level :: proc "c" (log: types.LogLevel) -> types.LogLevel {
   return types.LogLevel.Normal;
 }
 
-default_config :: proc () -> map[string]string {
+@(export, link_prefix="ygg_utils_", require_results)
+default_config :: proc "c" () -> map[string]string {
   default: map[string]string = {};
 
   default["log_level"]    = "v";
   default["target"]       = "x86_64";
   default["headless"]     = "false";
   default["test_mode"]    = "false";
-  default["renderer"]     = "OpenGL";
   default["optimization"] = "debug";
   default["cache"]        = "true";
 
   return default;
 }
 
-default_window :: proc (window: types.Window = {}) -> types.Window {
+@(export, link_prefix="ygg_utils_", require_results)
+default_window :: proc "c" (window: types.Window = {}) -> types.Window {
   new_window: types.Window = {};
   glfw_handle := glfw.CreateWindow(800, 600, "Default Window", nil, nil);
 
@@ -96,9 +102,10 @@ default_window :: proc (window: types.Window = {}) -> types.Window {
 
   new_window.glfw_handle = glfw_handle;
   new_window.title = "Yggdrasil";
-  new_window.dimensions = { 800, 600 };
+  new_window.width = 800;
+  new_window.height = 600;
   new_window.offset = { 0, 0 };
-  new_window.refresh_rate = utils.none(u16);
+  new_window.refresh_rate_opt = 0;
 
   return new_window;
 }

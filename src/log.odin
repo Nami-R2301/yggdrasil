@@ -5,16 +5,17 @@ import strings  "core:strings";
 
 import types "types";
 
-print_nodes :: proc(root: ^types.Node, indent: string = "  ", is_root_node: bool = true) {
+@(export, link_prefix="ygg_")
+print_nodes :: proc(root: ^types.Node, indent: cstring = "  ", is_root_node: bool = true) {
     if root == nil {
         return;
     }
 
     node := root^;
-    inner_indent := indent;
-    left_padding := strings.concatenate({ indent, "       " }, context.temp_allocator);
+    inner_indent := string(indent);
+    c_indent := cstring(raw_data(inner_indent));
+    left_padding := strings.concatenate({ string(indent), "       " }, context.temp_allocator);
     outer_indent := strings.concatenate({ left_padding, "    " }, context.temp_allocator);
-
 
     // If we are root
     if node.parent == nil || is_root_node {
@@ -40,8 +41,8 @@ print_nodes :: proc(root: ^types.Node, indent: string = "  ", is_root_node: bool
         fmt.printf("\n{}------------", inner_indent);
     }
 
-    for node, &value in node.children {
-        print_nodes(&value, inner_indent, false);
+    for _, &value in node.children {
+        print_nodes(&value, c_indent, false);
     }
 
     // CLose children nodes : children [2] : {...}.

@@ -1,7 +1,7 @@
 package types;
 
-import      "core:os";
-import      "base:runtime";
+import  "core:os";
+import  "base:runtime";
 
 // Aggregate all errors into this type when a procedure might return multiple types of errors.
 Error :: union {
@@ -16,13 +16,6 @@ Error :: union {
   FontError,
   os.Error,
   runtime.Allocator_Error
-}
-
-
-// Rust-like optional type in odin.
-Option :: union ($T: typeid) {
-  T,
-  rawptr
 }
 
 // File types supported for loading UI elements from common web formats.
