@@ -22,7 +22,8 @@ end_frame :: proc "c" (ctx: ^types.Context) {
     "Did you add or forget some matching 'end_nodes(...)' to your 'begin_nodes(...)' ?");
 
     if ctx.renderer != nil {
-        core.render_now({800, 600}, ctx.renderer.pipeline);
+        vp: [2]u32 = ctx.window != nil ? {ctx.window.width, ctx.window.height} : {800, 600};
+        core.render_now(vp, ctx.renderer.pipeline);
     }
 
     // Cleanup queue & tree.
@@ -35,6 +36,5 @@ end_frame :: proc "c" (ctx: ^types.Context) {
     core.detach_node(ctx, ctx.root.id);
     free(ctx.root);
     ctx.root = nil;
-    ctx.last_node = nil;
 }
 

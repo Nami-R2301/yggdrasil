@@ -6,7 +6,8 @@ Buffer :: struct {
     length: u64,
     capacity: u64,
     id: u32,
-    type: BufferType
+    type: BufferType,
+    binding: u8,     // Texture unit slot (only relevant for Texture type)
 }
 
 BufferError :: enum u8 {
@@ -23,6 +24,7 @@ BufferType :: enum u8 {
     Vbo = 0,
     Vao,
     Framebuffer,
+    Texture,
 }
 
 Vertex :: struct #packed {

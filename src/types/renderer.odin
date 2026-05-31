@@ -26,6 +26,7 @@ BufferPipeline :: struct {
   vbo:          Buffer,
   framebuffer:  Buffer,
   program:      Program,
+  textures:     [dynamic]Buffer,
 }
 
 RendererError :: enum u8 {

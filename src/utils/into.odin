@@ -249,19 +249,13 @@ into_str_buffer :: proc(buffer: ^types.Buffer, indent: string = "  ") -> string 
 into_str_ctx :: proc(ctx: ^types.Context, indent: string = "  ") -> string {
 	inner_indent := strings.concatenate({indent, "  "}, context.temp_allocator)
 
-	last_node: string = "nil"
-	if ctx.last_node != nil {
-		last_node = into_str(ctx.last_node, inner_indent)
-	}
-
 	new_str := fmt.tprintf(
 		"Context: {{\n{0}  Debug Level: {},\n{0}  Root ptr: {}," +
-		"\n{0}  Window ptr: ({}),\n{0}  Last Node ptr: {},\n{0}  Cursor: [{},{}],\n{0}}}",
+		"\n{0}  Window ptr: ({}),\n{0}  Cursor: [{},{}],\n{0}}}",
 		indent,
 		into_str(ctx.log_level),
 		into_str(ctx.root, inner_indent),
 		ctx.window == nil ? nil : ctx.window,
-		last_node,
 		ctx.cursor[0],
 		ctx.cursor[1],
 	)
@@ -339,13 +333,13 @@ into_measure :: proc(measure_str: Maybe(string)) -> [2]u32 {
 	x_trimmed := strings.trim(coords[0], " ")
 	if strings.contains_any(str, "px") {
 		// We are in pixel coord land - easy
-		x_pixel, x_ok := strconv.parse_int(x_trimmed)
+		x_pixel, x_ok := strconv.parse_int(strings.trim_suffix(x_trimmed, "px"))
 		if !x_ok {
 			x_pixel = 0
 		}
 
 		y_trimmed := strings.trim(coords[1], " ")
-		y_pixel, y_ok := strconv.parse_int(y_trimmed)
+		y_pixel, y_ok := strconv.parse_int(strings.trim_suffix(y_trimmed, "px"))
 		if !y_ok {
 			y_pixel = 0
 		}

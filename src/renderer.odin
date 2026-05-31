@@ -120,10 +120,10 @@ destroy_renderer :: proc "c" (renderer_ptr: ^types.Renderer, indent: cstring = "
         gl.DeleteTextures(2, &renderer_ptr.pipeline.framebuffer.attachments_opt[0]);
     }
 
-    for &texture in renderer_ptr.textures {
+    for &texture in renderer_ptr.pipeline.textures {
         gl.DeleteTextures(1, &texture.id);
     }
-    delete(renderer_ptr.textures);
+    delete(renderer_ptr.pipeline.textures);
 
     renderer_ptr.state = types.RendererState.Destroyed;
     fmt.println("Done");
@@ -193,26 +193,34 @@ render_now :: proc "c" (
     gl.Enable(gl.BLEND);
     gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    // READ from UI, DRAW to surface (0)
+    // Bind buffers and use UI shader
+    gl.BindFramebuffer(gl.FRAMEBUFFER, pipeline.framebuffer.id)
+    gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    gl.UseProgram(pipeline.program);
+    update_viewport_and_camera(i32(viewport[0]), i32(viewport[1]))
+
+    saved_active, saved_ids := bind_pipeline_textures(pipeline)
+    saved_has_tex            := set_has_texture(pipeline, len(pipeline.textures) > 0)
+
+    gl.BindVertexArray(pipeline.vao.id);
+    gl.BindBuffer(gl.ARRAY_BUFFER, pipeline.vbo.id);
+
+    gl.DrawArrays(gl.TRIANGLE_STRIP, 0, i32(pipeline.vbo.count));
+
+    set_has_texture(pipeline, saved_has_tex != 0)
+    restore_pipeline_textures(pipeline, saved_active, saved_ids)
+
+    // READ from UI FBO, DRAW to surface (0)
     gl.BindFramebuffer(gl.READ_FRAMEBUFFER, pipeline.framebuffer.id)
     gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
 
-    // Copy the UI FBO onto the surface FBO
     gl.BlitFramebuffer(
     0, 0, i32(viewport[0]), i32(viewport[1]), // Source Rect
     0, 0, i32(viewport[0]), i32(viewport[1]), // Dest Rect
     gl.COLOR_BUFFER_BIT,
     gl.LINEAR
     )
-
-    // Bind buffers and use UI shader
-    gl.BindFramebuffer(gl.FRAMEBUFFER, pipeline.framebuffer.id)
-    gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.UseProgram(pipeline.program);
-    gl.BindVertexArray(pipeline.vao.id);
-    gl.BindBuffer(gl.ARRAY_BUFFER, pipeline.vbo.id);
-
-    gl.DrawArrays(gl.TRIANGLE_STRIP, 0, i32(pipeline.vbo.count));
 
     if vao_exists && vbo_exists {
         gl.BindBuffer(gl.ARRAY_BUFFER, last_vbo);

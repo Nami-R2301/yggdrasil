@@ -56,12 +56,12 @@ create_context :: proc "c" (
     ctx_ptr := new_clone(types.Context {
         window     = window_handle,
         root       = nil,
-        last_node  = nil,
         config     = config != nil ? config^ : utils.default_config(),
         cursor     = { 0, 0 },
         renderer   = renderer_handle,
         _context   = context,
-        _arena     = new(vmem.Arena)
+        _arena     = new(vmem.Arena),
+        _node_cache = {}
     });
 
     // This library does not free its individual dynamic allocs. Just put the whole context in an arena and no leaking
@@ -98,6 +98,10 @@ create_context :: proc "c" (
         ctx_ptr.window = new_clone(window);
     }
 
+    if ctx_ptr.window != nil {
+        bind_window_ptr(ctx_ptr.window);
+    }
+
     if ctx_ptr.window != nil && ctx_ptr.renderer == nil {
         if level >= types.LogLevel.Verbose {
             fmt.printfln("[WARN]:  --- No renderer handle found, creating one ...");
@@ -106,8 +110,10 @@ create_context :: proc "c" (
         ctx_ptr.renderer = new_clone(renderer);
     }
 
-    // Setup default font glyphs for text rendering
-    init_font(ctx_ptr, indent = new_c_indent);
+    // Setup default font glyphs for text rendering (requires OpenGL context)
+    if ctx_ptr.renderer != nil {
+        init_font(ctx_ptr, indent = new_c_indent);
+    }
 
     if level >= types.LogLevel.Verbose {
         str := utils.into_str(ctx_ptr, "           ");
@@ -148,10 +154,13 @@ reset_context :: proc "c" (ctx: ^types.Context, indent: cstring = "  ") {
         delete_map(ctx.config);
         ctx.config = {};
     }
+    if len(ctx._node_cache) > 0 {
+        delete_map(ctx._node_cache);
+        ctx._node_cache = {};
+    }
     ctx.root = nil;
     ctx.window = nil;
     ctx.cursor = { 0, 0 };
-    ctx.last_node = nil;
     ctx.config = {};
 
     // Init offset and zero memory

@@ -58,7 +58,6 @@ default_ctx :: proc "c" (ctx: types.Context) -> types.Context {
   return types.Context {
     window = nil,
     root = nil,
-    last_node = nil,
     cursor = {0, 0},
     renderer = nil,
     config = {}

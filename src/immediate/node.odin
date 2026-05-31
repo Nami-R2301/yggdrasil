@@ -82,7 +82,7 @@ text :: proc "c" (
     content:    string,
     is_inline:  bool = false,
     style:      map[string]Maybe(string) = {}) -> (types.Node, types.Error) {
-    return begin_node(ctx, "title", is_inline, style);
+    return begin_node(ctx, content, is_inline, style);
 }
 
 @(export, link_prefix="ygg_im_")

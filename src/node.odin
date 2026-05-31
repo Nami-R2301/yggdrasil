@@ -46,7 +46,7 @@ create_node :: proc "c" (
         parent != nil ? parent.tag : "nil", parent != nil ? parent.id : 0, parent);
     }
 
-    parent_node     := parent != nil ? parent : ctx.last_node;
+    parent_node     := parent;
     new_id: int     = utils.unwrap_or(id, 0);
     will_overflow   := utils.check_id_overflow(new_id);
 
@@ -117,6 +117,9 @@ destroy_node :: proc "c" (
     }
 
     for node_to_delete in nodes_to_delete_ordered {
+        // Remove from cache
+        delete_key(&ctx._node_cache, node_to_delete.id);
+
         if len(node_to_delete.children) != 0 {
             delete_map(node_to_delete.children);
             if err != mem.Allocator_Error.None {
@@ -158,7 +161,7 @@ attach_node :: proc "c" (
     context = ctx._context;
 
     level: types.LogLevel = ctx.log_level;
-    parent_ptr : ^types.Node = node.parent != nil ? node.parent : ctx.last_node;
+    parent_ptr : ^types.Node = node.parent;
     new_node   : types.Node  = node;
     mem_err: mem.Allocator_Error;
 
@@ -171,9 +174,10 @@ attach_node :: proc "c" (
         ctx.root, mem_err = new_clone(node);
         assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
         new_node   = ctx.root^;
-        ctx.last_node = ctx.root;
+        // Cache root node
+        ctx._node_cache[ctx.root.id] = ctx.root;
 
-    } else if ctx.last_node != parent_ptr {
+    } else {
         new_indent, mem_error := strings.concatenate({string(indent), "  "}, context.temp_allocator);
         c_indent := cstring(raw_data(new_indent));
         assert(mem_error == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
@@ -194,13 +198,15 @@ attach_node :: proc "c" (
         free(ctx.root);
         ctx.root, mem_err = new_clone(new_node);
         assert(mem_err == mem.Allocator_Error.None, "[ERR]:\tCannot attach node: Out of memory (buy more ram)");
+        // Update cache for new root
+        ctx._node_cache[ctx.root.id] = ctx.root;
 
-        ctx.last_node = ctx.root;
     } else {
         new_node.parent = parent_ptr;
         if parent_ptr != nil {
             parent_ptr.children[node.id] = new_node;
-            ctx.last_node = &parent_ptr.children[node.id];
+            // Cache the newly attached child
+            ctx._node_cache[node.id] = &parent_ptr.children[node.id];
         }
     }
 
@@ -213,7 +219,7 @@ attach_node :: proc "c" (
             print_nodes(parent_ptr, c_indent);
         }
 
-        fmt.printfln("[INFO]:{}--- Done (%p)", indent, ctx.last_node);
+        fmt.printfln("[INFO]:{}--- Done", indent);
     }
 }
 
@@ -287,20 +293,23 @@ find_node_with_id :: proc "c" (
         return ctx.root;
     }
 
-    if id == ctx.root.id {
+    // Check cache first - O(1) lookup
+    if cached_node, found := ctx._node_cache[id]; found {
         if level >= types.LogLevel.Verbose {
-            fmt.println(" Done");
+            fmt.println(" Done (cached)");
         }
-
-        return ctx.root;
+        return cached_node;
     }
 
+    // Fallback to tree traversal if not in cache
     node_ptr := flatten_and_find_node(ctx.root, id = id, allocator = context.temp_allocator);
 
     if node_ptr != nil && node_ptr.id == id {
         if level >= types.LogLevel.Verbose {
             fmt.println(" Done");
         }
+        // Add to cache for future lookups
+        ctx._node_cache[id] = node_ptr;
         return node_ptr;
     }
 

@@ -1,7 +1,7 @@
 package ygg;
 
 import fmt      "core:fmt";
-import os       "core:os/os2";
+import os       "core:os";
 import mem      "core:mem";
 import runtime  "base:runtime";
 
@@ -16,6 +16,7 @@ init_font :: proc "c" (
     font_name:  cstring = "./res/fonts/default/JetBrainsMono-Regular.ttf",
     indent:     cstring = "  ") -> types.Error {
     assert_contextless(ctx != nil, "[ERR]:\tCannot init font: Context is nil");
+    context = ctx._context;
     font := load_font(font_name, indent, ctx._context.allocator);
 
     // Bake the letters ' ' (32) through '~' (126) into the bitmap
@@ -38,8 +39,16 @@ init_font :: proc "c" (
     // GL_RED is used because we only have 1 byte per pixel (Alpha/Grayscale)
     gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RED, 512, 512, 0, gl.RED, gl.UNSIGNED_BYTE, raw_data(font.font_bitmap[:]));
     gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.BindTexture(gl.TEXTURE_2D, 0);
 
     ctx.primary_font = font;
+
+    append(&ctx.renderer.pipeline.textures, types.Buffer{
+        id      = tex_id,
+        type    = types.BufferType.Texture,
+        binding = 10,
+    });
+
     return types.FontError.None;
 }
 
@@ -77,7 +86,7 @@ load_font :: proc "c" (
 
 // Helper to pack two 16-bit floats (0.0-1.0) into one 32-bit float
 pack_uv :: proc(u, v: f32) -> f32 {
-// Convert 0.0-1.0 to 0-65535 (16-bit integer range)
+    // Convert 0.0-1.0 to 0-65535 (16-bit integer range)
     u_int := u32(clamp(u, 0, 1) * 65535.0);
     v_int := u32(clamp(v, 0, 1) * 65535.0);
 
@@ -106,16 +115,17 @@ create_glyphs :: proc(
         if r < 32 || r > 126 do continue;
 
         q: ttf.aligned_quad;
-        ttf.GetBakedQuad(raw_data(font.cdata[:]), 512, 512, i32(r) - 32, &x, &y, &q, b32(1));
+        flag: u8 = 1;
+        ttf.GetBakedQuad(raw_data(font.cdata[:]), 512, 512, i32(r) - 32, &x, &y, &q, b32(flag));
 
         // Strip Order: BL -> BR -> TL -> TR
-        v_bl := types.Vertex{ entity_id = entity_id, position = { q.x0, q.y0, pack_uv(q.s0, q.t0)} };
-        v_br := types.Vertex{ entity_id = entity_id, position = { q.x1, q.y0, pack_uv(q.s1, q.t0)} };
-        v_tl := types.Vertex{ entity_id = entity_id, position = { q.x0, q.y1, pack_uv(q.s0, q.t1)} };
-        v_tr := types.Vertex{ entity_id = entity_id, position = { q.x1, q.y1, pack_uv(q.s1, q.t1)} };
+        v_bl := types.Vertex{ entity_id = entity_id, position = {q.x0, q.y0, 0}, color = {1,1,1,1}, tex_coords = {q.s0, q.t0} };
+        v_br := types.Vertex{ entity_id = entity_id, position = {q.x1, q.y0, 0}, color = {1,1,1,1}, tex_coords = {q.s1, q.t0} };
+        v_tl := types.Vertex{ entity_id = entity_id, position = {q.x0, q.y1, 0}, color = {1,1,1,1}, tex_coords = {q.s0, q.t1} };
+        v_tr := types.Vertex{ entity_id = entity_id, position = {q.x1, q.y1, 0}, color = {1,1,1,1}, tex_coords = {q.s1, q.t1} };
 
         if !first_char {
-        // Repeat the LAST vertex of the previous quad
+            // Repeat the LAST vertex of the previous quad
             append(&vertices, vertices[len(vertices)-1]);
 
             // Repeat the FIRST vertex of the current quad

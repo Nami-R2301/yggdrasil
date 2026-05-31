@@ -28,6 +28,8 @@ create_window :: proc "c" (
     refresh_rate_opt:   Maybe(i32) = nil,
     indent:             cstring = "  ") -> types.Window {
     context = runtime.default_context();
+
+    glfw.InitHint(glfw.PLATFORM, glfw.PLATFORM_X11);
     assert(bool(glfw.Init()), "[ERR]:\tFATAL: Cannot initialize GLFW");
 
     odin_str := string(indent);
@@ -112,6 +114,11 @@ swap_buffers :: proc "c" (window_ptr: ^types.Window) {
     }
 
     glfw.SwapBuffers(window_ptr.glfw_handle);
+}
+
+@(private)
+bind_window_ptr :: proc "c" (window_ptr: ^types.Window) {
+    glfw.SetWindowUserPointer(window_ptr.glfw_handle, window_ptr);
 }
 
 @(private)
