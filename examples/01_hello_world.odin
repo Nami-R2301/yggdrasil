@@ -39,7 +39,7 @@ hello_retained :: proc () {
     // Add text in box at the root of the tree (omitted parent_ptr arg)
     style_map := make(map[string]Maybe(string), ctx._context.allocator);
     style_map["position"]   = "abs, center";
-    style_map["box-size"]   = "400px, 200px";
+    style_map["box-size"]   = "1000px, 800px";
     style_map["box-color"]  = "0x2C2C2CFF";
     style_map["font-size"]  = "32px";
     style_map["text-align"] = "center";

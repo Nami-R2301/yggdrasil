@@ -23,6 +23,6 @@ main :: proc () {
         mem.tracking_allocator_destroy(&track);
     }
 
-    hello_immediate();
+    //hello_immediate();
     hello_retained();
 }
