@@ -40,7 +40,7 @@ typedef enum {
   None = 0,
   InvalidContext,
   IDOverflow,
-  UinitializedContext,
+  UninitializedContext,
   HeadlessMode,  // When the user tries to create or use a window when they are in headless mode.
   ArenaAllocFailed  // If our arena can't reserve the 1GB of memory for the ctx for some reason
 } ContextError;
