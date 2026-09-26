@@ -157,6 +157,7 @@ into_str_bool :: proc(value: bool) -> string {
 
 @(export, link_prefix = "ygg_utils_", require_results)
 into_str_option :: proc($T: typeid, opt: Maybe(T), indent: string = "  ") -> string {
+	opt := opt;
 	#partial switch &value in opt {
 	case T:
 		{
@@ -316,14 +317,22 @@ into_quad :: proc(vertices_ptr: ^[5]types.Vertex) -> stb_font.Quad {
 }
 
 @(export, link_prefix = "ygg_utils_", require_results)
-into_measure :: proc(measure_str: Maybe(string)) -> [2]u32 {
-	default: [2]u32 = {50, 50}
+into_measure :: proc(measure_str: Maybe(string), bounding_box: [4]u32) -> [2]u32 {
+	default: [2]u32 = {bounding_box[0], bounding_box[1]}
 
 	if is_none(measure_str) {
 		return default
 	}
 
 	str := unwrap(measure_str)
+	if strings.contains(str, "center") {
+        w, h := bounding_box.z, bounding_box.w
+        return {
+          w > bounding_box.z ? (w - bounding_box.z) / 2 : 0,
+          h > bounding_box.w ? (h - bounding_box.w) / 2 : 0,
+        }
+	}
+
 	coords := strings.split(str, ",")
 
 	if len(coords) == 0 {

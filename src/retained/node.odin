@@ -22,19 +22,8 @@ box :: proc "c" (
 
     assert_contextless(ctx.renderer != nil, "[ERR]:\tCannot create box node: Renderer is nil!");
 
-    size_pixels: [2]u32     = utils.into_measure(style["box-size"]);
-    position_pixels: [2]u32 = utils.into_measure(style["position"]);
-
-    #partial switch pos_str in style["position"] {
-    case string:
-        if strings.contains(pos_str, "center") && ctx.window != nil {
-            w, h := ctx.window.width, ctx.window.height
-            position_pixels = {
-                w > size_pixels.x ? (w - size_pixels.x) / 2 : 0,
-                h > size_pixels.y ? (h - size_pixels.y) / 2 : 0,
-            }
-        }
-    }
+    size_pixels: [2]u32     = {0,0};
+    position_pixels: [2]u32 = {0,0};
 
     z_index: u16        = utils.into_z_index(style["z-index"]);
     fill_color: [4]f32  = utils.into_color(style["box-color"]);

@@ -38,15 +38,15 @@ hello_retained :: proc () {
 
     // Add text in box at the root of the tree (omitted parent_ptr arg)
     style_map := make(map[string]Maybe(string), ctx._context.allocator);
-    style_map["position"]   = "abs, center";
-    style_map["box-size"]   = "1000px, 800px";
+    style_map["position"]   = "center";
+    style_map["box-size"]   = "400px, 200px";
     style_map["box-color"]  = "0x2C2C2CFF";
     style_map["font-size"]  = "32px";
     style_map["text-align"] = "center";
 
     defer delete_map(style_map);
 
-    text := rt.text(ctx, content = "Hello World!", style = style_map);
+    text := rt.text(ctx, content = "Hello my beautiful farah!", style = style_map);
 
     // Need to call this explicitely before rendering in retained mode, unlike immediate
     _ = core.prepare_nodes(ctx, nodes = {&text});
